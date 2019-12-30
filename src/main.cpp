@@ -1,5 +1,12 @@
 #include <Arduino.h>
 #include <SerialTransfer.h>
+#include <Servo.h>
+
+uint8_t motorPinLeft = 22;
+uint8_t motorPinRight = 23;
+
+Servo motorLeft;
+Servo motorRight;
 
 struct MotorSpeeds
 {
@@ -15,9 +22,6 @@ void setup()
 {
   Serial.begin(115200);
   Serial2.begin(1152000);
-  myTransfer.begin(Serial2);
-  motorSpeeds.left = 0;
-  motorSpeeds.right = 0;
   while (!Serial)
   {
   };
@@ -25,11 +29,18 @@ void setup()
   while (!Serial2)
   {
   };
+
+  motorLeft.attach(motorPinLeft);
+  motorRight.attach(motorPinRight);
+
+  myTransfer.begin(Serial2);
+  motorSpeeds.left = 0;
+  motorSpeeds.right = 0;
 }
 
 void loop()
 {
-  Serial.println("waiting for data");
+  // Serial.println("waiting for data");
   if (myTransfer.available())
   {
     uint8_t recSize = 0;
@@ -38,16 +49,19 @@ void loop()
     Serial.print(' ');
     Serial.print(motorSpeeds.right);
     Serial.println();
+
+    motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(motorSpeeds.right, -100, 100, 1000, 2000));
   }
-  else if (myTransfer.status < 0)
-  {
-    Serial.print("ERROR: ");
-    Serial.println(myTransfer.status);
-  }
-  else
-  {
-    Serial.print("waiting:");
-    Serial.println(myTransfer.status);
-  }
+  // else if (myTransfer.status < 0)
+  // {
+  //   Serial.print("ERROR: ");
+  //   Serial.println(myTransfer.status);
+  // }
+  // else
+  // {
+  //   Serial.print("waiting:");
+  //   Serial.println(myTransfer.status);
+  // }
   delay(20);
 }
