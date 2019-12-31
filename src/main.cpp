@@ -2,6 +2,8 @@
 #include <SerialTransfer.h>
 #include <Servo.h>
 
+#define DEBUG
+
 uint8_t motorPinLeft = 22;
 uint8_t motorPinRight = 23;
 
@@ -20,12 +22,14 @@ int8_t step = 1;
 
 void setup()
 {
+  #ifdef DEBUG
   Serial.begin(115200);
-  Serial2.begin(1152000);
   while (!Serial)
   {
   };
+  #endif
 
+  Serial2.begin(1152000);
   while (!Serial2)
   {
   };
@@ -45,10 +49,13 @@ void loop()
   {
     uint8_t recSize = 0;
     myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
+    #ifdef DEBUG
     Serial.print(motorSpeeds.left);
     Serial.print(' ');
     Serial.print(motorSpeeds.right);
     Serial.println();
+    #endif
+
 
     motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(motorSpeeds.right, -100, 100, 1000, 2000));
