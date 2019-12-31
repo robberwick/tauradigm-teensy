@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Chrono.h>
 #include <SerialTransfer.h>
 #include <Servo.h>
 
@@ -10,64 +11,63 @@ uint8_t motorPinRight = 23;
 Servo motorLeft;
 Servo motorRight;
 
-struct MotorSpeeds
-{
-  float left;
-  float right;
+struct MotorSpeeds {
+    float left;
+    float right;
 } motorSpeeds;
 
 SerialTransfer myTransfer;
 
 int8_t step = 1;
 
-void setup()
-{
+Chrono sendMessage;
+
+void setup() {
 #ifdef DEBUG
-  Serial.begin(115200);
-  while (!Serial)
-  {
-  };
+    Serial.begin(115200);
+    while (!Serial) {
+    };
 #endif
 
-  Serial2.begin(1152000);
-  while (!Serial2)
-  {
-  };
+    Serial2.begin(1152000);
+    while (!Serial2) {
+    };
 
-  motorLeft.attach(motorPinLeft);
-  motorRight.attach(motorPinRight);
+    motorLeft.attach(motorPinLeft);
+    motorRight.attach(motorPinRight);
 
-  myTransfer.begin(Serial2);
-  motorSpeeds.left = 0;
-  motorSpeeds.right = 0;
+    myTransfer.begin(Serial2);
+    motorSpeeds.left = 0;
+    motorSpeeds.right = 0;
 }
 
-void loop()
-{
-  // Serial.println("waiting for data");
-  if (myTransfer.available())
-  {
-    uint8_t recSize = 0;
-    myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
+void loop() {
+    // Serial.println("waiting for data");
+    if (sendMessage.hasPassed(20)) {
+        // restart the timeout
+        sendMessage.restart();
+        if (myTransfer.available()) {
+            uint8_t recSize = 0;
+            myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
 #ifdef DEBUG
-    Serial.print(motorSpeeds.left);
-    Serial.print(' ');
-    Serial.print(motorSpeeds.right);
-    Serial.println();
+            Serial.print(motorSpeeds.left);
+            Serial.print(' ');
+            Serial.print(motorSpeeds.right);
+            Serial.println();
 #endif
 
-    motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
-    motorRight.writeMicroseconds(map(motorSpeeds.right, -100, 100, 1000, 2000));
-  }
-  // else if (myTransfer.status < 0)
-  // {
-  //   Serial.print("ERROR: ");
-  //   Serial.println(myTransfer.status);
-  // }
-  // else
-  // {
-  //   Serial.print("waiting:");
-  //   Serial.println(myTransfer.status);
-  // }
-  delay(20);
+            motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
+            motorRight.writeMicroseconds(map(motorSpeeds.right, -100, 100, 1000, 2000));
+        }
+        // else if (myTransfer.status < 0)
+        // {
+        //   Serial.print("ERROR: ");
+        //   Serial.println(myTransfer.status);
+        // }
+        // else
+        // {
+        //   Serial.print("waiting:");
+        //   Serial.println(myTransfer.status);
+        // }
+    }
 }
