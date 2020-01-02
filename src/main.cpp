@@ -57,7 +57,7 @@ void loop() {
 #endif
 
             motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
-            motorRight.writeMicroseconds(map(motorSpeeds.right, -100, 100, 1000, 2000));
+            motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
         }
         // else if (myTransfer.status < 0)
         // {
