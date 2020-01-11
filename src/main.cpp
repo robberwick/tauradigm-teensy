@@ -4,7 +4,7 @@
 #include <Servo.h>
 #include <VL53L0X.h>
 #include "Wire.h"
-#include "teensy_pins.h"
+#include "teensy_config.h"
 
 #define DEBUG
 
