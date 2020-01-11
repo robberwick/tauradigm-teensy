@@ -24,6 +24,7 @@ Chrono sendMessage;
 VL53L0X sensor;
 
 float distances[8];
+bool activeToFSensors[8];
 
 void tcaselect(uint8_t i) {
     if (i > 7) return;
@@ -50,7 +51,6 @@ void setup() {
     myTransfer.begin(Serial2);
     motorSpeeds.left = 0;
     motorSpeeds.right = 0;
-    Serial.print("Setting sensor timeout");
 
     Wire.begin();
     tcaselect(0);
@@ -67,7 +67,9 @@ void setup() {
         // fast as possible).  To use continuous timed mode
         // instead, provide a desired inter-measurement period in
         // ms (e.g. sensor.startContinuous(100)).
-        if (!sensor.init()) {
+
+        activeToFSensors[t] = sensor.init();
+        if (!activeToFSensors[t]) {
             /*
             TODO What to do to indicate sensor init failure?
             don't attempt to read from failed sensor? show in i2c oled?
@@ -76,8 +78,8 @@ void setup() {
             #ifdef DEBUG
             Serial.print("Failed to detect and initialize sensor: ");
             Serial.println(t);
-            while (1) {
-            }
+            // while (1) {
+            // }
             #endif
         } else {
             sensor.startContinuous();
@@ -117,12 +119,23 @@ void loop() {
     }
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
-        distances[t] = sensor.readRangeContinuousMillimeters();
-        #ifdef DEBUG
-        if (sensor.timeoutOccurred()) {
-            Serial.printf("TIMEOUT READING ToF %d", t);
+        if (activeToFSensors[t]) {
+            distances[t] = sensor.readRangeContinuousMillimeters();
+            if (sensor.timeoutOccurred()) {
+                distances[t] = 0;
+                #ifdef DEBUG
+                Serial.printf("TIMEOUT READING ToF %d", t);
+                #endif
+            }
+        } else {
+            distances[t] = 0;
         }
-        #endif
+        if (sensor.timeoutOccurred()) {
+            distances[t] = 0;
+            #ifdef DEBUG
+            Serial.printf("TIMEOUT READING ToF %d", t);
+            #endif
+        }
     }
     #ifdef DEBUG
     Serial.printf("distances: %.2f %.2f", distances[0], distances[1]);
@@ -130,4 +143,7 @@ void loop() {
     #endif
     myTransfer.txObj(distances, sizeof(distances), 0);
     myTransfer.sendData(sizeof(distances));
+    #ifdef DEBUG
+    Serial.printf("%d", sizeof(distances));
+    #endif
 }
