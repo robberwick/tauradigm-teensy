@@ -76,7 +76,6 @@ void setup() {
             #ifdef DEBUG
             Serial.print("Failed to detect and initialize sensor: ");
             Serial.println(t);
-            #endif
             while (1) {
             }
             #endif
@@ -130,4 +129,5 @@ void loop() {
     Serial.println();
     #endif
     myTransfer.txObj(distances, sizeof(distances), 0);
+    myTransfer.sendData(sizeof(distances));
 }
