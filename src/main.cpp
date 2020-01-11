@@ -79,6 +79,7 @@ void setup() {
             #endif
             while (1) {
             }
+            #endif
         } else {
             sensor.startContinuous();
         }
