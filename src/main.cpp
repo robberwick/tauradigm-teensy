@@ -6,8 +6,6 @@
 #include "Wire.h"
 #include "teensy_pins.h"
 
-#define TCAADDR 0x70
-
 #define DEBUG
 
 Servo motorLeft;

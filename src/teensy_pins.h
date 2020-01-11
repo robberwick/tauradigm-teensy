@@ -1,3 +1,4 @@
+// Pins
 #define TEENSY_PIN_ENC1A (0)
 #define TEENSY_PIN_ENC1B (1)
 #define TEENSY_PIN_ENC2A (2)
@@ -22,3 +23,7 @@
 #define TEENSY_PIN_HEADLIGHT_PWM (21)
 #define TEENSY_PIN_DRIVE_LEFT (22)
 #define TEENSY_PIN_DRIVE_RIGHT (23)
+
+// i2c Addresses
+#define TCAADDR 0x70
+
