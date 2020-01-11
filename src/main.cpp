@@ -4,13 +4,11 @@
 #include <Servo.h>
 #include <VL53L0X.h>
 #include "Wire.h"
+#include "teensy_pins.h"
 
 #define TCAADDR 0x70
 
 #define DEBUG
-
-uint8_t motorPinLeft = 22;
-uint8_t motorPinRight = 23;
 
 Servo motorLeft;
 Servo motorRight;
@@ -48,8 +46,8 @@ void setup() {
     // while (!Serial2) {
     // };
 
-    motorLeft.attach(motorPinLeft);
-    motorRight.attach(motorPinRight);
+    motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
+    motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
 
     myTransfer.begin(Serial2);
     motorSpeeds.left = 0;
