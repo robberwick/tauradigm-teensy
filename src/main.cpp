@@ -6,7 +6,7 @@
 #include "Wire.h"
 #include "teensy_config.h"
 
-#define DEBUG
+// #define DEBUG
 
 Servo motorLeft;
 Servo motorRight;
