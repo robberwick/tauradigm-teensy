@@ -31,7 +31,9 @@ float distances[8];
 bool activeToFSensors[8];
 
 void tcaselect(uint8_t i) {
-    if (i > 7) return;
+    if (i > 7) {
+        return;
+    }
 
     Wire.beginTransmission(TCAADDR);
     Wire.write(1 << i);
@@ -79,7 +81,6 @@ void setup() {
 #ifdef DEBUG
             Serial.printf("Sensor %d init success", t);
 #endif
-
         } else {
             /*
             TODO What to do to indicate sensor init failure?
@@ -124,37 +125,32 @@ void loop() {
 #endif
     }
     for (uint8_t t = 0; t < 8; t++) {
-        //         tcaselect(t);
-        //         if (activeToFSensors[t]) {
-        //             distances[t] = sensor.readRangeContinuousMillimeters();
-        //             if (sensor.timeoutOccurred()) {
-        //                 distances[t] = 0;
-        // #ifdef DEBUG
-        //                 Serial.printf("TIMEOUT READING ToF %d", t);
-        // #endif
-        //             }
-        //         } else {
-        //             distances[t] = 0;
-        //         }
-
-        distances[t] = 100.0;
+        tcaselect(t);
+        if (activeToFSensors[t]) {
+            distances[t] = sensor.readRangeContinuousMillimeters();
+            if (sensor.timeoutOccurred()) {
+                distances[t] = 0;
+#ifdef DEBUG
+                Serial.printf("TIMEOUT READING ToF %d", t);
+#endif
+            }
+        } else {
+            distances[t] = 0;
+        }
     }
-    // #ifdef DEBUG
-    //     Serial.printf(
-    //         "distances: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
-    //         distances[0],
-    //         distances[1],
-    //         distances[2],
-    //         distances[3],
-    //         distances[4],
-    //         distances[5],
-    //         distances[6],
-    //         distances[7]);
-    //     Serial.println();
-    // #endif
+#ifdef DEBUG
+    Serial.printf(
+        "distances: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
+        distances[0],
+        distances[1],
+        distances[2],
+        distances[3],
+        distances[4],
+        distances[5],
+        distances[6],
+        distances[7]);
+    Serial.println();
+#endif
     myTransfer.txObj(distances, sizeof(distances), 0);
     myTransfer.sendData(sizeof(distances));
-    // #ifdef DEBUG
-    //     Serial.printf("%d", sizeof(distances));
-    // #endif
 }
