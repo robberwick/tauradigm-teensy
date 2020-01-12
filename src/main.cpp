@@ -6,6 +6,10 @@
 #include "Wire.h"
 #include "teensy_config.h"
 
+extern "C" {
+#include "utility/twi.h"  // from Wire library, so we can do bus scanning
+}
+
 // #define DEBUG
 
 Servo motorLeft;
@@ -56,33 +60,38 @@ void setup() {
     tcaselect(0);
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
-        #ifdef DEBUG
+#ifdef DEBUG
         Serial.print("TCA Port #");
         Serial.println(t);
         sensor.setTimeout(500);
         Serial.print("init sensor: ");
         Serial.println(t);
-        #endif
+#endif
         // Start continuous back-to-back mode (take readings as
         // fast as possible).  To use continuous timed mode
         // instead, provide a desired inter-measurement period in
         // ms (e.g. sensor.startContinuous(100)).
 
         activeToFSensors[t] = sensor.init();
-        if (!activeToFSensors[t]) {
+
+        if (activeToFSensors[t]) {
+            sensor.startContinuous();
+#ifdef DEBUG
+            Serial.printf("Sensor %d init success", t);
+#endif
+
+        } else {
             /*
             TODO What to do to indicate sensor init failure?
             don't attempt to read from failed sensor? show in i2c oled?
             */
-            
-            #ifdef DEBUG
+#ifdef DEBUG
             Serial.print("Failed to detect and initialize sensor: ");
             Serial.println(t);
             // while (1) {
             // }
-            #endif
-        } else {
-            sensor.startContinuous();
+
+#endif
         }
     }
 }
@@ -105,45 +114,47 @@ void loop() {
             motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
         }
 #ifdef DEBUG
-        else if (myTransfer.status < 0)
-        {
-          Serial.print("ERROR: ");
-          Serial.println(myTransfer.status);
-        }
-        else
-        {
-          Serial.print("waiting:");
-          Serial.println(myTransfer.status);
+        else if (myTransfer.status < 0) {
+            Serial.print("ERROR: ");
+            Serial.println(myTransfer.status);
+        } else {
+            Serial.print("waiting:");
+            Serial.println(myTransfer.status);
         }
 #endif
     }
     for (uint8_t t = 0; t < 8; t++) {
-        tcaselect(t);
-        if (activeToFSensors[t]) {
-            distances[t] = sensor.readRangeContinuousMillimeters();
-            if (sensor.timeoutOccurred()) {
-                distances[t] = 0;
-                #ifdef DEBUG
-                Serial.printf("TIMEOUT READING ToF %d", t);
-                #endif
-            }
-        } else {
-            distances[t] = 0;
-        }
-        if (sensor.timeoutOccurred()) {
-            distances[t] = 0;
-            #ifdef DEBUG
-            Serial.printf("TIMEOUT READING ToF %d", t);
-            #endif
-        }
+        //         tcaselect(t);
+        //         if (activeToFSensors[t]) {
+        //             distances[t] = sensor.readRangeContinuousMillimeters();
+        //             if (sensor.timeoutOccurred()) {
+        //                 distances[t] = 0;
+        // #ifdef DEBUG
+        //                 Serial.printf("TIMEOUT READING ToF %d", t);
+        // #endif
+        //             }
+        //         } else {
+        //             distances[t] = 0;
+        //         }
+
+        distances[t] = 100.0;
     }
-    #ifdef DEBUG
-    Serial.printf("distances: %.2f %.2f", distances[0], distances[1]);
-    Serial.println();
-    #endif
+    // #ifdef DEBUG
+    //     Serial.printf(
+    //         "distances: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
+    //         distances[0],
+    //         distances[1],
+    //         distances[2],
+    //         distances[3],
+    //         distances[4],
+    //         distances[5],
+    //         distances[6],
+    //         distances[7]);
+    //     Serial.println();
+    // #endif
     myTransfer.txObj(distances, sizeof(distances), 0);
     myTransfer.sendData(sizeof(distances));
-    #ifdef DEBUG
-    Serial.printf("%d", sizeof(distances));
-    #endif
+    // #ifdef DEBUG
+    //     Serial.printf("%d", sizeof(distances));
+    // #endif
 }
