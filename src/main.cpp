@@ -48,8 +48,8 @@ void setup() {
 #endif
 
     Serial2.begin(1152000);
-    // while (!Serial2) {
-    // };
+    while (!Serial2) {
+    };
 
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
