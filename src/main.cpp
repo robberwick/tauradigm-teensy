@@ -5,6 +5,7 @@
 #include <VL53L0X.h>
 #include "Wire.h"
 #include "teensy_config.h"
+#include <Encoder.h>
 
 extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
@@ -25,10 +26,21 @@ SerialTransfer myTransfer;
 int8_t step = 1;
 
 Chrono sendMessage;
+Chrono readSensors;
 VL53L0X sensor;
 
 float distances[8];
 bool activeToFSensors[8];
+Encoder encoders[NUM_ENCODERS] = {
+    Encoder(TEENSY_PIN_ENC1A, TEENSY_PIN_ENC1B),
+    Encoder(TEENSY_PIN_ENC2A, TEENSY_PIN_ENC2B),
+    Encoder(TEENSY_PIN_ENC3A, TEENSY_PIN_ENC3B),
+    Encoder(TEENSY_PIN_ENC4A, TEENSY_PIN_ENC4B),
+    Encoder(TEENSY_PIN_ENC5A, TEENSY_PIN_ENC5B),
+    Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)
+    };
+
+long encoderReadings[NUM_ENCODERS];
 
 void tcaselect(uint8_t i) {
     if (i > 7) {
@@ -98,6 +110,8 @@ void setup() {
 }
 
 void loop() {
+    // If the message sending timeout has passed then attempt to read
+    // motor speeds and apply them
     if (sendMessage.hasPassed(20)) {
         // restart the timeout
         sendMessage.restart();
@@ -124,6 +138,10 @@ void loop() {
         }
 #endif
     }
+
+    if (readSensors.hasPassed(10)) {
+        readSensors.restart();
+    // Iterate through ToF sensors and attempt to get reading
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
         if (activeToFSensors[t]) {
@@ -151,6 +169,23 @@ void loop() {
         distances[7]);
     Serial.println();
 #endif
-    myTransfer.txObj(distances, sizeof(distances), 0);
-    myTransfer.sendData(sizeof(distances));
+
+    /// Read Encoder counts
+    for (u_int8_t n=0; n < NUM_ENCODERS; n++) {
+        encoderReadings[n] = encoders[n].read();
+    }
+
+    uint16_t payloadSize = 0;
+
+    // Prepare the distance data
+    myTransfer.txObj(distances, sizeof(distances), payloadSize);
+    payloadSize += sizeof(distances);
+
+    //Prepare encoder data
+    myTransfer.txObj(encoderReadings, sizeof(encoderReadings), payloadSize);
+    payloadSize += sizeof(encoderReadings);
+
+    // Send data
+    myTransfer.sendData(payloadSize);
+    }
 }
