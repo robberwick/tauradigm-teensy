@@ -1,11 +1,11 @@
 #include <Arduino.h>
 #include <Chrono.h>
+#include <Encoder.h>
 #include <SerialTransfer.h>
 #include <Servo.h>
 #include <VL53L0X.h>
 #include "Wire.h"
 #include "teensy_config.h"
-#include <Encoder.h>
 
 extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
@@ -20,6 +20,7 @@ struct MotorSpeeds {
     float left;
     float right;
 } motorSpeeds;
+uint8_t missedMotorMessageCount = 0;
 
 SerialTransfer myTransfer;
 
@@ -37,8 +38,7 @@ Encoder encoders[NUM_ENCODERS] = {
     Encoder(TEENSY_PIN_ENC3A, TEENSY_PIN_ENC3B),
     Encoder(TEENSY_PIN_ENC4A, TEENSY_PIN_ENC4B),
     Encoder(TEENSY_PIN_ENC5A, TEENSY_PIN_ENC5B),
-    Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)
-    };
+    Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)};
 
 long encoderReadings[NUM_ENCODERS];
 
@@ -116,76 +116,76 @@ void loop() {
         // restart the timeout
         sendMessage.restart();
         if (myTransfer.available()) {
+            // reset missing motor message count
+            missedMotorMessageCount = 0;
             uint8_t recSize = 0;
             myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
-#ifdef DEBUG
-            Serial.print(motorSpeeds.left);
-            Serial.print(' ');
-            Serial.print(motorSpeeds.right);
-            Serial.println();
-#endif
-
-            motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
-            motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
-        }
-#ifdef DEBUG
-        else if (myTransfer.status < 0) {
-            Serial.print("ERROR: ");
-            Serial.println(myTransfer.status);
         } else {
-            Serial.print("waiting:");
-            Serial.println(myTransfer.status);
+            missedMotorMessageCount++;
         }
-#endif
     }
+    // Have we missed 5 valid motor messages?
+    if (missedMotorMessageCount >= 5) {
+        motorSpeeds.left = 0;
+        motorSpeeds.right = 0;
+    }
+#ifdef DEBUG
+    Serial.print(motorSpeeds.left);
+    Serial.print(' ');
+    Serial.print(motorSpeeds.right);
+    Serial.println();
+#endif
+    // Write motorspeeds
+    motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
-    // Iterate through ToF sensors and attempt to get reading
-    for (uint8_t t = 0; t < 8; t++) {
-        tcaselect(t);
-        if (activeToFSensors[t]) {
-            distances[t] = sensor.readRangeContinuousMillimeters();
-            if (sensor.timeoutOccurred()) {
+        // Iterate through ToF sensors and attempt to get reading
+        for (uint8_t t = 0; t < 8; t++) {
+            tcaselect(t);
+            if (activeToFSensors[t]) {
+                distances[t] = sensor.readRangeContinuousMillimeters();
+                if (sensor.timeoutOccurred()) {
+                    distances[t] = 0;
+#ifdef DEBUG
+                    Serial.printf("TIMEOUT READING ToF %d", t);
+#endif
+                }
+            } else {
                 distances[t] = 0;
-#ifdef DEBUG
-                Serial.printf("TIMEOUT READING ToF %d", t);
-#endif
             }
-        } else {
-            distances[t] = 0;
         }
-    }
 #ifdef DEBUG
-    Serial.printf(
-        "distances: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
-        distances[0],
-        distances[1],
-        distances[2],
-        distances[3],
-        distances[4],
-        distances[5],
-        distances[6],
-        distances[7]);
-    Serial.println();
+        Serial.printf(
+            "distances: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
+            distances[0],
+            distances[1],
+            distances[2],
+            distances[3],
+            distances[4],
+            distances[5],
+            distances[6],
+            distances[7]);
+        Serial.println();
 #endif
 
-    /// Read Encoder counts
-    for (u_int8_t n=0; n < NUM_ENCODERS; n++) {
-        encoderReadings[n] = encoders[n].read();
-    }
+        /// Read Encoder counts
+        for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+            encoderReadings[n] = encoders[n].read();
+        }
 
-    uint16_t payloadSize = 0;
+        uint16_t payloadSize = 0;
 
-    // Prepare the distance data
-    myTransfer.txObj(distances, sizeof(distances), payloadSize);
-    payloadSize += sizeof(distances);
+        // Prepare the distance data
+        myTransfer.txObj(distances, sizeof(distances), payloadSize);
+        payloadSize += sizeof(distances);
 
-    //Prepare encoder data
-    myTransfer.txObj(encoderReadings, sizeof(encoderReadings), payloadSize);
-    payloadSize += sizeof(encoderReadings);
+        //Prepare encoder data
+        myTransfer.txObj(encoderReadings, sizeof(encoderReadings), payloadSize);
+        payloadSize += sizeof(encoderReadings);
 
-    // Send data
-    myTransfer.sendData(payloadSize);
+        // Send data
+        myTransfer.sendData(payloadSize);
     }
 }
