@@ -20,6 +20,7 @@ struct MotorSpeeds {
     float left;
     float right;
 } motorSpeeds;
+uint8_t missedMotorMessageCount = 0;
 
 SerialTransfer myTransfer;
 
@@ -37,8 +38,7 @@ Encoder encoders[NUM_ENCODERS] = {
     Encoder(TEENSY_PIN_ENC3A, TEENSY_PIN_ENC3B),
     Encoder(TEENSY_PIN_ENC4A, TEENSY_PIN_ENC4B),
     Encoder(TEENSY_PIN_ENC5A, TEENSY_PIN_ENC5B),
-    Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)
-    };
+    Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)};
 
 long encoderReadings[NUM_ENCODERS];
 
@@ -116,28 +116,28 @@ void loop() {
         // restart the timeout
         receiveMessage.restart();
         if (myTransfer.available()) {
+            // reset missing motor message count
+            missedMotorMessageCount = 0;
             uint8_t recSize = 0;
             myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
-#ifdef DEBUG
-            Serial.print(motorSpeeds.left);
-            Serial.print(' ');
-            Serial.print(motorSpeeds.right);
-            Serial.println();
-#endif
-
-            motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
-            motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
-        }
-#ifdef DEBUG
-        else if (myTransfer.status < 0) {
-            Serial.print("ERROR: ");
-            Serial.println(myTransfer.status);
         } else {
-            Serial.print("waiting:");
-            Serial.println(myTransfer.status);
+            missedMotorMessageCount++;
         }
-#endif
     }
+    // Have we missed 5 valid motor messages?
+    if (missedMotorMessageCount >= 5) {
+        motorSpeeds.left = 0;
+        motorSpeeds.right = 0;
+    }
+#ifdef DEBUG
+    Serial.print(motorSpeeds.left);
+    Serial.print(' ');
+    Serial.print(motorSpeeds.right);
+    Serial.println();
+#endif
+    // Write motorspeeds
+    motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
