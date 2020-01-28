@@ -30,6 +30,8 @@ Chrono receiveMessage;
 Chrono readSensors;
 VL53L0X sensor;
 
+enum MessageType : uint8_t { MOTOR };
+
 float distances[8];
 bool activeToFSensors[8];
 Encoder encoders[NUM_ENCODERS] = {
@@ -109,22 +111,11 @@ void setup() {
     }
 }
 
-void loop() {
-    // If the message receive timeout has passed then attempt to read
-    // incoming message and apply it
-    if (receiveMessage.hasPassed(20)) {
-        // restart the timeout
-        receiveMessage.restart();
-        // Is there a valid incoming message?
-        if (myTransfer.available()) {
-            // reset missing motor message count
-            missedMotorMessageCount = 0;
-            uint8_t recSize = 0;
-            myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
-        } else {
-            missedMotorMessageCount++;
-        }
-    }
+void SetMotorSpeed() {
+    // reset missing motor message count
+    missedMotorMessageCount = 0;
+    uint8_t recSize = 0;
+    myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 5) {
         motorSpeeds.left = 0;
@@ -139,6 +130,30 @@ void loop() {
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
+}
+
+void loop() {
+    // If the message receive timeout has passed then attempt to read
+    // incoming message and apply it
+    if (receiveMessage.hasPassed(20)) {
+        // restart the timeout
+        receiveMessage.restart();
+        // Is there a valid incoming message?
+        if (myTransfer.available()) {
+            // message type is encoded in first byte of payload
+            MessageType messageType = MOTOR;
+
+            if (messageType == MOTOR) {
+                SetMotorSpeed();
+            }
+            
+        } else {
+            // We've tried and failed to get a valid motor message
+            // so increment the failed message count
+            missedMotorMessageCount++;
+        }
+    }
+    
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
