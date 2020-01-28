@@ -110,11 +110,12 @@ void setup() {
 }
 
 void loop() {
-    // If the message sending timeout has passed then attempt to read
-    // motor speeds and apply them
+    // If the message receive timeout has passed then attempt to read
+    // incoming message and apply it
     if (receiveMessage.hasPassed(20)) {
         // restart the timeout
         receiveMessage.restart();
+        // Is there a valid incoming message?
         if (myTransfer.available()) {
             // reset missing motor message count
             missedMotorMessageCount = 0;
