@@ -59,9 +59,11 @@ void setup() {
         activeToFSensors[t] = sensor.init();
 
         if (activeToFSensors[t]) {
+            // sensor.setMeasurementTimingBudget(200000);
             sensor.startContinuous();
 #ifdef DEBUG
             Serial.printf("Sensor %d init success", t);
+            Serial.printf("measurement timing budget: %d", sensor.getMeasurementTimingBudget());
 #endif
         } else {
             /*
@@ -80,7 +82,7 @@ void setup() {
 }
 
 void loop() {
-    if (readSensors.hasPassed(10)) {
+    if (readSensors.hasPassed(100)) {
         readSensors.restart();
     // Iterate through ToF sensors and attempt to get reading
     for (uint8_t t = 0; t < 8; t++) {
