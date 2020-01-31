@@ -11,36 +11,13 @@ extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
 
-// #define DEBUG
-
-Servo motorLeft;
-Servo motorRight;
-
-struct MotorSpeeds {
-    float left;
-    float right;
-} motorSpeeds;
-
-SerialTransfer myTransfer;
-
-int8_t step = 1;
-
-Chrono sendMessage;
+#define DEBUG
 Chrono readSensors;
 VL53L0X sensor;
 
 float distances[8];
 bool activeToFSensors[8];
-Encoder encoders[NUM_ENCODERS] = {
-    Encoder(TEENSY_PIN_ENC1A, TEENSY_PIN_ENC1B),
-    Encoder(TEENSY_PIN_ENC2A, TEENSY_PIN_ENC2B),
-    Encoder(TEENSY_PIN_ENC3A, TEENSY_PIN_ENC3B),
-    Encoder(TEENSY_PIN_ENC4A, TEENSY_PIN_ENC4B),
-    Encoder(TEENSY_PIN_ENC5A, TEENSY_PIN_ENC5B),
-    Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)
-    };
 
-long encoderReadings[NUM_ENCODERS];
 
 void tcaselect(uint8_t i) {
     if (i > 7) {
@@ -62,13 +39,6 @@ void setup() {
     Serial2.begin(1152000);
     while (!Serial2) {
     };
-
-    motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
-    motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
-
-    myTransfer.begin(Serial2);
-    motorSpeeds.left = 0;
-    motorSpeeds.right = 0;
 
     Wire.begin();
     tcaselect(0);
@@ -110,35 +80,6 @@ void setup() {
 }
 
 void loop() {
-    // If the message sending timeout has passed then attempt to read
-    // motor speeds and apply them
-    if (sendMessage.hasPassed(20)) {
-        // restart the timeout
-        sendMessage.restart();
-        if (myTransfer.available()) {
-            uint8_t recSize = 0;
-            myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
-#ifdef DEBUG
-            Serial.print(motorSpeeds.left);
-            Serial.print(' ');
-            Serial.print(motorSpeeds.right);
-            Serial.println();
-#endif
-
-            motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
-            motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
-        }
-#ifdef DEBUG
-        else if (myTransfer.status < 0) {
-            Serial.print("ERROR: ");
-            Serial.println(myTransfer.status);
-        } else {
-            Serial.print("waiting:");
-            Serial.println(myTransfer.status);
-        }
-#endif
-    }
-
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
     // Iterate through ToF sensors and attempt to get reading
@@ -169,23 +110,5 @@ void loop() {
         distances[7]);
     Serial.println();
 #endif
-
-    /// Read Encoder counts
-    for (u_int8_t n=0; n < NUM_ENCODERS; n++) {
-        encoderReadings[n] = encoders[n].read();
-    }
-
-    uint16_t payloadSize = 0;
-
-    // Prepare the distance data
-    myTransfer.txObj(distances, sizeof(distances), payloadSize);
-    payloadSize += sizeof(distances);
-
-    //Prepare encoder data
-    myTransfer.txObj(encoderReadings, sizeof(encoderReadings), payloadSize);
-    payloadSize += sizeof(encoderReadings);
-
-    // Send data
-    myTransfer.sendData(payloadSize);
     }
 }
