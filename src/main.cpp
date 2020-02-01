@@ -125,7 +125,7 @@ void loop() {
         }
     }
     // Have we missed 5 valid motor messages?
-    if (missedMotorMessageCount >= 5) {
+    if (missedMotorMessageCount >= 50) {
         motorSpeeds.left = 0;
         motorSpeeds.right = 0;
     }
