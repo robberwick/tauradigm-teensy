@@ -20,7 +20,7 @@ struct MotorSpeeds {
     float left;
     float right;
 } motorSpeeds;
-uint8_t missedMotorMessageCount = 0;
+uint32_t missedMotorMessageCount = 0;
 
 SerialTransfer myTransfer;
 
