@@ -89,6 +89,7 @@ void setup() {
         activeToFSensors[t] = sensor.init();
 
         if (activeToFSensors[t]) {
+            sensor.setMeasurementTimingBudget(20000);
             sensor.startContinuous();
 #ifdef DEBUG
             Serial.printf("Sensor %d init success", t);
