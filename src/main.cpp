@@ -208,7 +208,7 @@ void setup() {
             display.setCursor(64, display.getCursorY());
         }
         display.display();
-        delay(1000);
+        delay(100);
     }
 
     // //initialise IMU
@@ -220,8 +220,29 @@ void setup() {
     } else {
         display.println("OK");
     }
+    uint8_t system, gyro, accel, mag;
+    system = gyro = accel = mag = 0;
+
+    u_int8_t curYPos = display.getCursorY();
+    while (!system) {
+        bno.getCalibration(&system, &gyro, &accel, &mag);
+        display.setCursor(0, curYPos);
+        /* Display the individual values */
+        display.print("Sys:");
+        display.print(system, DEC);
+        display.print(" G:");
+        display.print(gyro, DEC);
+        display.print(" A:");
+        display.print(accel, DEC);
+        display.print(" M:");
+        display.println(mag, DEC);
+        display.display();
+    };
+    display.println("calibrated OK");
     display.display();
-    delay(1000);
+    delay(2000);
+    display.clearDisplay();
+    display.display();
 }
 
 void loop() {
