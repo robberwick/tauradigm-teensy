@@ -1,13 +1,13 @@
-#include <Arduino.h>
 #include <Adafruit_SSD1306.h>
+#include <Arduino.h>
 #include <Chrono.h>
 #include <Encoder.h>
 #include <SerialTransfer.h>
 #include <Servo.h>
 #include <VL53L0X.h>
 #include "Wire.h"
-#include "teensy_config.h"
 #include "graphics.h"
+#include "teensy_config.h"
 
 extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
@@ -58,6 +58,11 @@ void tcaselect(uint8_t i) {
     Wire.endTransmission();
 }
 
+void haltAndCatchFire() {
+    while (1) {
+    }
+}
+
 void setup() {
 #ifdef DEBUG
     Serial.begin(115200);
@@ -77,19 +82,18 @@ void setup() {
     motorSpeeds.right = 0;
 
     Wire.begin();
-    
+
     if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDRESS)) {
         Serial.println("SSD1306 allocation failed");
-        for(;;);
+        haltAndCatchFire();
     }
 
     display.clearDisplay();
 
     display.drawBitmap(
-        (display.width()  - LOGO_WIDTH ) / 2,
+        (display.width() - LOGO_WIDTH) / 2,
         (display.height() - LOGO_HEIGHT) / 2,
-        logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1
-    );
+        logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
     display.display();
     tcaselect(0);
     for (uint8_t t = 0; t < 8; t++) {
@@ -122,8 +126,6 @@ void setup() {
 #ifdef DEBUG
             Serial.print("Failed to detect and initialize sensor: ");
             Serial.println(t);
-            // while (1) {
-            // }
 
 #endif
         }
@@ -150,12 +152,7 @@ void loop() {
         motorSpeeds.left = 0;
         motorSpeeds.right = 0;
     }
-#ifdef DEBUG
-    Serial.print(motorSpeeds.left);
-    Serial.print(' ');
-    Serial.print(motorSpeeds.right);
-    Serial.println();
-#endif
+
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
@@ -169,27 +166,11 @@ void loop() {
                 distances[t] = sensor.readRangeContinuousMillimeters();
                 if (sensor.timeoutOccurred()) {
                     distances[t] = 0;
-#ifdef DEBUG
-                    Serial.printf("TIMEOUT READING ToF %d", t);
-#endif
                 }
             } else {
                 distances[t] = 0;
             }
         }
-#ifdef DEBUG
-        Serial.printf(
-            "distances: %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f",
-            distances[0],
-            distances[1],
-            distances[2],
-            distances[3],
-            distances[4],
-            distances[5],
-            distances[6],
-            distances[7]);
-        Serial.println();
-#endif
 
         /// Read Encoder counts
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
