@@ -26,6 +26,7 @@
 
 // i2c Addresses
 #define TCAADDR 0x70
+#define DISPLAY_ADDR 0x3c
 
 // hardware counts
 #define NUM_ENCODERS 6

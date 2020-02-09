@@ -44,8 +44,6 @@ Encoder encoders[NUM_ENCODERS] = {
 
 long encoderReadings[NUM_ENCODERS];
 
-#define DISPLAY_ADDRESS 0x3c
-
 Adafruit_SSD1306 display(128, 64);
 
 void tcaselect(uint8_t i) {
@@ -83,8 +81,7 @@ void setup() {
 
     Wire.begin();
 
-    if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDRESS)) {
-        Serial.println("SSD1306 allocation failed");
+    if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
         haltAndCatchFire();
     }
 
