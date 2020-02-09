@@ -13,7 +13,7 @@ extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
 
-// #define DEBUG
+#define DEBUG
 
 Servo motorLeft;
 Servo motorRight;
@@ -61,9 +61,54 @@ void haltAndCatchFire() {
     }
 }
 
+void do_i2c_scan() {
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println("I2c Devices");
+    for (uint8_t addr = 1; addr <= 127; addr++) {
+        uint8_t data;
+        if (!twi_writeTo(addr, &data, 0, 1, 1)) {
+            display.print("0x");
+            display.println(addr, HEX);
+        }
+    }
+    display.display();
+}
+
 void setup() {
+    // Initialise I2C bus
+    Wire.begin();
+
+    // Initalise display and show logo
+    if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
+        // TODO show failure message on OLED
+        haltAndCatchFire();
+    }
+    display.setTextSize(1);                              // Normal 1:1 pixel scale
+    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
+    display.setCursor(0, 0);                             // Start at top-left corner
+    display.cp437(true);                                 // Use full 256 char 'Code Page 437' font
+
+    display.clearDisplay();
+
+    display.drawBitmap(
+        (display.width() - LOGO_WIDTH) / 2,
+        (display.height() - LOGO_HEIGHT) / 2,
+        logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+    display.display();
+    delay(3000);
+
     // Setup serial comms
+    // Show debug warning if debug flag is set
 #ifdef DEBUG
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(F("*** WARNING ***"));
+    display.println("");
+    display.println("Debug flag is set");
+    display.println("Waiting for\nUSB serial");
+    display.display();
+    delay(1000);
     Serial.begin(115200);
     while (!Serial) {
     };
@@ -73,48 +118,47 @@ void setup() {
     while (!Serial2) {
     };
 
-    // Initialise I2C bus
-    Wire.begin();
+    // do i2c scan
+    do_i2c_scan();
+    delay(2000);
 
     // Attach motors
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(F("Motors"));
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
     // Initialise motor speeds
     motorSpeeds.left = 0;
     motorSpeeds.right = 0;
+    display.setCursor(0, 10);
+    display.print("OK");
+    display.display();
+    delay(1000);
 
     // Initialise serial transfer
-    myTransfer.begin(Serial2);
-
-    // Initalise display and show logo
-    if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
-        // TODO show failure message on OLED
-        haltAndCatchFire();
-    }
-
     display.clearDisplay();
-
-    display.drawBitmap(
-        (display.width() - LOGO_WIDTH) / 2,
-        (display.height() - LOGO_HEIGHT) / 2,
-        logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+    display.setCursor(0, 0);
+    display.println(F("Serial transfer"));
+    display.setCursor(0, 10);
+    display.print("OK");
+    myTransfer.begin(Serial2);
     display.display();
+    delay(1000);
 
     // Initialise ToF sensors
     tcaselect(0);
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(F("ToF sensors"));
+    display.setCursor(0, 10);
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
-#ifdef DEBUG
-        Serial.print("TCA Port #");
-        Serial.println(t);
-        sensor.setTimeout(500);
-        Serial.print("init sensor: ");
-        Serial.println(t);
-#endif
 
         activeToFSensors[t] = sensor.init();
 
         if (activeToFSensors[t]) {
+            display.printf("%d: OK", t);
             sensor.setMeasurementTimingBudget(20000);
             // Start continuous back-to-back mode (take readings as
             // fast as possible).  To use continuous timed mode
@@ -122,8 +166,15 @@ void setup() {
             // ms (e.g. sensor.startContinuous(100)).
             sensor.startContinuous();
         } else {
-            // TODO Show failure on oled
+            display.printf("%d: FAIL", t);
         }
+        if (t % 2 == 1) {
+            display.println("");
+        } else {
+            display.setCursor(64, display.getCursorY());
+        }
+        display.display();
+        delay(1000);
     }
 }
 
