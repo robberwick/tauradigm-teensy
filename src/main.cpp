@@ -62,6 +62,7 @@ void haltAndCatchFire() {
 }
 
 void setup() {
+    // Setup serial comms
 #ifdef DEBUG
     Serial.begin(115200);
     while (!Serial) {
@@ -72,16 +73,22 @@ void setup() {
     while (!Serial2) {
     };
 
+    // Initialise I2C bus
+    Wire.begin();
+
+    // Attach motors
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
-
-    myTransfer.begin(Serial2);
+    // Initialise motor speeds
     motorSpeeds.left = 0;
     motorSpeeds.right = 0;
 
-    Wire.begin();
+    // Initialise serial transfer
+    myTransfer.begin(Serial2);
 
+    // Initalise display and show logo
     if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
+        // TODO show failure message on OLED
         haltAndCatchFire();
     }
 
@@ -92,6 +99,8 @@ void setup() {
         (display.height() - LOGO_HEIGHT) / 2,
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
     display.display();
+
+    // Initialise ToF sensors
     tcaselect(0);
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
@@ -102,29 +111,18 @@ void setup() {
         Serial.print("init sensor: ");
         Serial.println(t);
 #endif
-        // Start continuous back-to-back mode (take readings as
-        // fast as possible).  To use continuous timed mode
-        // instead, provide a desired inter-measurement period in
-        // ms (e.g. sensor.startContinuous(100)).
 
         activeToFSensors[t] = sensor.init();
 
         if (activeToFSensors[t]) {
             sensor.setMeasurementTimingBudget(20000);
+            // Start continuous back-to-back mode (take readings as
+            // fast as possible).  To use continuous timed mode
+            // instead, provide a desired inter-measurement period in
+            // ms (e.g. sensor.startContinuous(100)).
             sensor.startContinuous();
-#ifdef DEBUG
-            Serial.printf("Sensor %d init success", t);
-#endif
         } else {
-            /*
-            TODO What to do to indicate sensor init failure?
-            don't attempt to read from failed sensor? show in i2c oled?
-            */
-#ifdef DEBUG
-            Serial.print("Failed to detect and initialize sensor: ");
-            Serial.println(t);
-
-#endif
+            // TODO Show failure on oled
         }
     }
 }
