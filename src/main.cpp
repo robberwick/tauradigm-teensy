@@ -1,10 +1,13 @@
+#include <Adafruit_BNO055.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <Chrono.h>
 #include <Encoder.h>
 #include <SerialTransfer.h>
 #include <Servo.h>
 #include <VL53L0X.h>
+#include <utility/imumaths.h>
 #include "Wire.h"
 #include "graphics.h"
 #include "teensy_config.h"
@@ -46,6 +49,8 @@ long encoderReadings[NUM_ENCODERS];
 
 Adafruit_SSD1306 display(128, 64);
 
+Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
+
 void tcaselect(uint8_t i) {
     if (i > 7) {
         return;
@@ -73,6 +78,36 @@ void do_i2c_scan() {
         }
     }
     display.display();
+}
+
+void printEvent(sensors_event_t* event) {
+    Serial.println();
+    Serial.print(event->type);
+    double x = -1000000, y = -1000000, z = -1000000;  //dumb values, easy to spot problem
+    if (event->type == SENSOR_TYPE_ACCELEROMETER) {
+        x = event->acceleration.x;
+        y = event->acceleration.y;
+        z = event->acceleration.z;
+    } else if (event->type == SENSOR_TYPE_ORIENTATION) {
+        x = event->orientation.x;
+        y = event->orientation.y;
+        z = event->orientation.z;
+    } else if (event->type == SENSOR_TYPE_MAGNETIC_FIELD) {
+        x = event->magnetic.x;
+        y = event->magnetic.y;
+        z = event->magnetic.z;
+    } else if ((event->type == SENSOR_TYPE_GYROSCOPE) || (event->type == SENSOR_TYPE_ROTATION_VECTOR)) {
+        x = event->gyro.x;
+        y = event->gyro.y;
+        z = event->gyro.z;
+    }
+
+    Serial.print(": x= ");
+    Serial.print(x);
+    Serial.print(" | y= ");
+    Serial.print(y);
+    Serial.print(" | z= ");
+    Serial.println(z);
 }
 
 void setup() {
@@ -154,7 +189,6 @@ void setup() {
     display.setCursor(0, 10);
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
-
         activeToFSensors[t] = sensor.init();
 
         if (activeToFSensors[t]) {
@@ -176,6 +210,18 @@ void setup() {
         display.display();
         delay(1000);
     }
+
+    // //initialise IMU
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(F("IMU"));
+    if (!bno.begin()) {
+        display.println("FAIL");
+    } else {
+        display.println("OK");
+    }
+    display.display();
+    delay(1000);
 }
 
 void loop() {
@@ -192,6 +238,19 @@ void loop() {
         } else {
             missedMotorMessageCount++;
         }
+
+        sensors_event_t orientationData, angVelocityData, linearAccelData;
+        bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
+        bno.getEvent(&angVelocityData, Adafruit_BNO055::VECTOR_GYROSCOPE);
+        bno.getEvent(&linearAccelData, Adafruit_BNO055::VECTOR_LINEARACCEL);
+
+        printEvent(&orientationData);
+        printEvent(&angVelocityData);
+        printEvent(&linearAccelData);
+
+        int8_t boardTemp = bno.getTemp();
+        Serial.print(F("temperature: "));
+        Serial.println(boardTemp);
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
