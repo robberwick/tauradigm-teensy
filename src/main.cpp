@@ -50,6 +50,11 @@ long encoderReadings[NUM_ENCODERS];
 Adafruit_SSD1306 display(128, 64);
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
+struct OrientationReading {
+    float x;
+    float y;
+    float z;
+} orientationReading;
 
 void tcaselect(uint8_t i) {
     if (i > 7) {
@@ -78,36 +83,6 @@ void do_i2c_scan() {
         }
     }
     display.display();
-}
-
-void printEvent(sensors_event_t* event) {
-    Serial.println();
-    Serial.print(event->type);
-    double x = -1000000, y = -1000000, z = -1000000;  //dumb values, easy to spot problem
-    if (event->type == SENSOR_TYPE_ACCELEROMETER) {
-        x = event->acceleration.x;
-        y = event->acceleration.y;
-        z = event->acceleration.z;
-    } else if (event->type == SENSOR_TYPE_ORIENTATION) {
-        x = event->orientation.x;
-        y = event->orientation.y;
-        z = event->orientation.z;
-    } else if (event->type == SENSOR_TYPE_MAGNETIC_FIELD) {
-        x = event->magnetic.x;
-        y = event->magnetic.y;
-        z = event->magnetic.z;
-    } else if ((event->type == SENSOR_TYPE_GYROSCOPE) || (event->type == SENSOR_TYPE_ROTATION_VECTOR)) {
-        x = event->gyro.x;
-        y = event->gyro.y;
-        z = event->gyro.z;
-    }
-
-    Serial.print(": x= ");
-    Serial.print(x);
-    Serial.print(" | y= ");
-    Serial.print(y);
-    Serial.print(" | z= ");
-    Serial.println(z);
 }
 
 void setup() {
@@ -149,7 +124,7 @@ void setup() {
     };
 #endif
 
-    Serial2.begin(1152000);
+    Serial2.begin(115200);
     while (!Serial2) {
     };
 
@@ -258,20 +233,7 @@ void loop() {
             myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
         } else {
             missedMotorMessageCount++;
-        }
-
-        sensors_event_t orientationData, angVelocityData, linearAccelData;
-        bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
-        bno.getEvent(&angVelocityData, Adafruit_BNO055::VECTOR_GYROSCOPE);
-        bno.getEvent(&linearAccelData, Adafruit_BNO055::VECTOR_LINEARACCEL);
-
-        printEvent(&orientationData);
-        printEvent(&angVelocityData);
-        printEvent(&linearAccelData);
-
-        int8_t boardTemp = bno.getTemp();
-        Serial.print(F("temperature: "));
-        Serial.println(boardTemp);
+        }   
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
@@ -303,6 +265,15 @@ void loop() {
             encoderReadings[n] = encoders[n].read();
         }
 
+        // Read IMU
+        sensors_event_t orientationData;
+        bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
+
+        orientationReading.x = orientationData.orientation.x;
+        orientationReading.y = orientationData.orientation.y;
+        orientationReading.z = orientationData.orientation.z;
+
+
         uint16_t payloadSize = 0;
 
         // Prepare the distance data
@@ -312,6 +283,10 @@ void loop() {
         //Prepare encoder data
         myTransfer.txObj(encoderReadings, sizeof(encoderReadings), payloadSize);
         payloadSize += sizeof(encoderReadings);
+
+        //Prepare IMU data
+        myTransfer.txObj(orientationReading, sizeof(orientationReading), payloadSize);
+        payloadSize += sizeof(orientationReading);
 
         // Send data
         myTransfer.sendData(payloadSize);
