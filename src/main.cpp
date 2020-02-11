@@ -60,6 +60,9 @@ void tcaselect(uint8_t i) {
 #define sgn(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
 
 float minMagnitude(float x, float y, float z) {
+    //function to find the smallest (closest to zero) value
+    // specifically, find the motor that is spinning slowest
+    // which is assumed to be the most representative of robot speed
     float currentMin = x;
     float currentMinMagnitude = abs(x);
     if (abs(y) < currentMinMagnitude) {
@@ -136,44 +139,80 @@ void loop() {
     Serial.println();
 #endif
     //convert -100 - +100 percentage speed command into mm/sec
+    // for autonomous control we could revert back to using full scale
+    // but for manual control, and for testing speedcontrol precision
+    // better to start with limiting to lower speeds 
     float maxspeed_mm_per_sec = 1000;  //max acheivable is 8000
     targetMotorSpeeds.right = targetMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = targetMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
     //convert speed commands into predicted power
-    float minTurnPower = 18;
-    float minForwardPower = 8;
-    float powerCoefficient = 113;
-    float turnThreshold = 100;
+    //otherwise known as feedforward. We can do feedforward
+    // and/or PID speed control. both is better but either
+    // alone should give functional results currently neither does 
+
+    float minTurnPower = 18;  //determined from practical testing
+    float minForwardPower = 8;  //same
+    float powerCoefficient = 113;  //same
+    float turnThreshold = 100;  //units: mm/sec. arbitary, value. 
+    // using the turnThreshold does create a discontinuity when transitioning
+    // from mostly straight ahead to a slight turn but then the two moves
+    // do need different power outputs. maybe linear interpolation between
+    // the two would be better?  
+
+   // since there's a min power needed to move (as defined above)
+   // first check if we're trying to move  
     if (targetMotorSpeeds.left != 0 and targetMotorSpeeds.right != 0) {
+        //then check if we're trying to turn or not, i.e. left and right speeds different
         if (abs(targetMotorSpeeds.right - targetMotorSpeeds.left) > turnThreshold) {
+            //then predict power needed to acheive that speed. formule dervied from curve fitting experimental results
             float turnComponent = sgn(targetMotorSpeeds.right - targetMotorSpeeds.left) * (abs(targetMotorSpeeds.right - targetMotorSpeeds.left) / powerCoefficient + minTurnPower);
             float forwardComponent = (targetMotorSpeeds.right + targetMotorSpeeds.left) / 2 / powerCoefficient;
             commandMotorSpeeds.right = turnComponent + forwardComponent;
             commandMotorSpeeds.left = -turnComponent + forwardComponent;
         } else {
+            //a different formula is best fit for going straight
             commandMotorSpeeds.right = sgn(targetMotorSpeeds.right) * abs(targetMotorSpeeds.right) / powerCoefficient + minForwardPower;
             commandMotorSpeeds.left = sgn(targetMotorSpeeds.left) * abs(targetMotorSpeeds.left) / powerCoefficient + minForwardPower;
         }
     } else {
+        //if we're not trying to move, turn the motors off
         commandMotorSpeeds.right = 0;
         commandMotorSpeeds.left = 0;
     }
 
     // apply PID
-    float kp = 1 / powerCoefficient;
-    float loopTime = (millis() - lastLoopTime) / 1000;  // divide by 1000 converts to seconds
-    float travelPerEncoderCount = 1;                    //millimeters per encoder count
+    //or at the moment, just proportional. i.e power percentage proporational
+    // to difference between desired speed and current actual wheel speed
+    float kp = 1 / powerCoefficient;  //ie. how much power to use for a given speed error
+    float loopTime = (millis() - lastLoopTime) / 1000;  // divide by 1000 converts to seconds.
+    float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
+
+    //compare old and latest encoder readings to see how much each wheel has rotated
+    //speed is distance/time and should be a float in mm/sec 
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
         motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
     }
+    
+    //command speeds set to zero here, just to test proportional alone without feedforward values calicualted above complicating it
     commandMotorSpeeds.left = 0;
     commandMotorSpeeds.right = 0;
 
     //probably wrong way around
+    //most representative speed assumed to be slowest wheel
+    //#0 & #1 known to be on one side of bot, #3 & #5 on the other
+    //at the moment, I'm not sure which is is which though...
     actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
     actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
 
+    // do actual Proportional calc.
+    //speed error is target - actual.
+    //example: command speed 1000mm/s (max practical speed)
+    //actual speed 100mm/s
+    //proportional calc gives (1000-100)*1/113 = 8,
+    // which happens to be the minimum forward power. so a max speed command should only *just*
+    //cause the bot to move. from testing power 8 should give a speed of 0-100mm/s.
+    // current code gives 0 to ~300mm/s spurts
     commandMotorSpeeds.left += kp * (targetMotorSpeeds.left - actualMotorSpeeds.left);
     commandMotorSpeeds.right += kp * (targetMotorSpeeds.right - actualMotorSpeeds.right);
 
@@ -199,8 +238,10 @@ void loop() {
         /// Read Encoder counts
 
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+            //stash old encoder readings so we know how much it changed this loop
             oldEncoderReadings[n] = encoderReadings[n];
             encoderReadings[n] = encoders[n].read();
+            //stash time encoders were read, so we can work out the speed
             lastLoopTime = millis();
         }
 
