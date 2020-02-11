@@ -19,7 +19,7 @@ Servo motorRight;
 struct MotorSpeeds {
     float left;
     float right;
-} motorSpeeds;
+} CommandMotorSpeeds, TargetMotorSpeeds;
 uint32_t missedMotorMessageCount = 0;
 
 SerialTransfer myTransfer;
@@ -41,6 +41,7 @@ Encoder encoders[NUM_ENCODERS] = {
     Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)};
 
 long encoderReadings[NUM_ENCODERS];
+long oldEncoderReadings[NUM_ENCODERS];
 
 void tcaselect(uint8_t i) {
     if (i > 7) {
@@ -51,6 +52,8 @@ void tcaselect(uint8_t i) {
     Wire.write(1 << i);
     Wire.endTransmission();
 }
+
+#define sgn(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
 
 void setup() {
 #ifdef DEBUG
@@ -67,8 +70,8 @@ void setup() {
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
 
     myTransfer.begin(Serial2);
-    motorSpeeds.left = 0;
-    motorSpeeds.right = 0;
+    TargetMotorSpeeds.left = 0;
+    TargetMotorSpeeds.right = 0;
 
     Wire.begin();
     tcaselect(0);
@@ -120,25 +123,50 @@ void loop() {
             // reset missing motor message count
             missedMotorMessageCount = 0;
             uint8_t recSize = 0;
-            myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
+            myTransfer.rxObj(TargetMotorSpeeds, sizeof(TargetMotorSpeeds), recSize);
         } else {
             missedMotorMessageCount++;
         }
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
-        motorSpeeds.left = 0;
-        motorSpeeds.right = 0;
+        TargetMotorSpeeds.left = 0;
+        TargetMotorSpeeds.right = 0;
     }
 #ifdef DEBUG
-    Serial.print(motorSpeeds.left);
+    Serial.print(TargetMotorSpeeds.left);
     Serial.print(' ');
-    Serial.print(motorSpeeds.right);
+    Serial.print(TargetMotorSpeeds.right);
     Serial.println();
 #endif
+    //convert -100 - +100 percentage speed command into mm/sec
+    float maxspeed_mm_per_sec = 1000; //max acheivable is 8000
+    TargetMotorSpeeds.right = TargetMotorSpeeds.right * maxspeed_mm_per_sec/100;
+    TargetMotorSpeeds.left = TargetMotorSpeeds.left * maxspeed_mm_per_sec/100;
+
+    //convert speed commands into predcited power
+    float minTurnPower = 18;
+    float minForwardPower = 8;
+    float powerCoefficient = 113;
+    float turnThreshold = 100;
+    if (TargetMotorSpeeds.left!=0 and TargetMotorSpeeds.right!=0){
+        if (abs(TargetMotorSpeeds.right-TargetMotorSpeeds.left)>turnThreshold) {
+            float turnComponent = sgn(TargetMotorSpeeds.right-TargetMotorSpeeds.left)*(abs(TargetMotorSpeeds.right-TargetMotorSpeeds.left)/powerCoefficient+minTurnPower);
+            float forwardComponent = (TargetMotorSpeeds.right+TargetMotorSpeeds.left)/2/powerCoefficient;
+            CommandMotorSpeeds.right = turnComponent + forwardComponent;
+            CommandMotorSpeeds.left = -turnComponent + forwardComponent;
+        } else {
+            CommandMotorSpeeds.right = sgn(TargetMotorSpeeds.right)*abs(TargetMotorSpeeds.right)/powerCoefficient+minForwardPower;
+            CommandMotorSpeeds.left =sgn(TargetMotorSpeeds.left)*abs(TargetMotorSpeeds.left)/powerCoefficient+minForwardPower;
+        }
+    } else {
+        CommandMotorSpeeds.right = 0;
+        CommandMotorSpeeds.left = 0;
+    }
+
     // Write motorspeeds
-    motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
-    motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
+    motorLeft.writeMicroseconds(map(CommandMotorSpeeds.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(CommandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
@@ -172,7 +200,9 @@ void loop() {
 #endif
 
         /// Read Encoder counts
+
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+            oldEncoderReadings[n] = encoderReadings[n];
             encoderReadings[n] = encoders[n].read();
         }
 
