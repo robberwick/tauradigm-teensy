@@ -13,7 +13,7 @@ extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
 
-#define DEBUG
+//#define DEBUG
 
 Servo motorLeft;
 Servo motorRight;
@@ -47,8 +47,6 @@ long encoderReadings[NUM_ENCODERS];
 long oldEncoderReadings[NUM_ENCODERS];
 float motorSpeeds[NUM_ENCODERS];
 
-Adafruit_SSD1306 display(128, 64);
-
 void tcaselect(uint8_t i) {
     if (i > 7) {
         return;
@@ -61,13 +59,13 @@ void tcaselect(uint8_t i) {
 
 
 #define sgn(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
-int i = (b) ? 0 : 1; // assign 0 to i if b is true, otherwise 1
-#define minmagnitude(x,y,z) {
+
+float minmagnitude(float x, float y, float z){
     float currentMin = x;
     float currentMinMagnitude = abs(x);
     if (abs(y) < currentMinMagnitude) {
-        currentMin = y;
-        currentMinMagnitude = abs(y)
+        currentMin = y ;
+        currentMinMagnitude = abs(y);
     }
     if (abs(z) < currentMinMagnitude) {
         currentMin = z;
@@ -79,54 +77,16 @@ int i = (b) ? 0 : 1; // assign 0 to i if b is true, otherwise 1
 void setup() {
     // Initialise I2C bus
     Wire.begin();
-
-    // Initalise display and show logo
-    if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
-        // TODO show failure message on OLED
-        haltAndCatchFire();
-    }
-    display.setTextSize(1);                              // Normal 1:1 pixel scale
-    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
-    display.setCursor(0, 0);                             // Start at top-left corner
-    display.cp437(true);                                 // Use full 256 char 'Code Page 437' font
-
-    display.clearDisplay();
-
-    display.drawBitmap(
-        (display.width() - LOGO_WIDTH) / 2,
-        (display.height() - LOGO_HEIGHT) / 2,
-        logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-    display.display();
-    delay(3000);
-
     // Setup serial comms
     // Show debug warning if debug flag is set
-#ifdef DEBUG
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("*** WARNING ***"));
-    display.println("");
-    display.println("Debug flag is set");
-    display.println("Waiting for\nUSB serial");
-    display.display();
-    delay(1000);
-    Serial.begin(115200);
-    while (!Serial) {
-    };
-#endif
+
 
     Serial2.begin(1152000);
     while (!Serial2) {
     };
 
-    // do i2c scan
-    do_i2c_scan();
-    delay(2000);
 
     // Attach motors
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("Motors"));
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
 
@@ -138,33 +98,19 @@ void setup() {
 
     // Initialise ToF sensors
     tcaselect(0);
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("ToF sensors"));
-    display.setCursor(0, 10);
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
 
         activeToFSensors[t] = sensor.init();
 
         if (activeToFSensors[t]) {
-            display.printf("%d: OK", t);
             sensor.setMeasurementTimingBudget(20000);
             // Start continuous back-to-back mode (take readings as
             // fast as possible).  To use continuous timed mode
             // instead, provide a desired inter-measurement period in
             // ms (e.g. sensor.startContinuous(100)).
             sensor.startContinuous();
-        } else {
-            display.printf("%d: FAIL", t);
-        }
-        if (t % 2 == 1) {
-            display.println("");
-        } else {
-            display.setCursor(64, display.getCursorY());
-        }
-        display.display();
-        delay(1000);
+        } 
     }
 }
 
@@ -213,20 +159,29 @@ void loop() {
             CommandMotorSpeeds.left = -turnComponent + forwardComponent;
         } else {
             CommandMotorSpeeds.right = sgn(TargetMotorSpeeds.right)*abs(TargetMotorSpeeds.right)/powerCoefficient+minForwardPower;
-            CommandMotorSpeeds.left =sgn(TargetMotorSpeeds.left)*abs(TargetMotorSpeeds.left)/powerCoefficient+minForwardPower;
+            CommandMotorSpeeds.left = sgn(TargetMotorSpeeds.left)*abs(TargetMotorSpeeds.left)/powerCoefficient+minForwardPower;
         }
     } else {
         CommandMotorSpeeds.right = 0;
         CommandMotorSpeeds.left = 0;
     }
+
     // apply PID
-    float kp = 0.1;
-    float loopTime = millis()-lastLoopTime;
+    float kp = 1/powerCoefficient;
+    float loopTime = (millis()-lastLoopTime)/1000; // divide by 1000 converts to seconds
+    float travelPerEncoderCount = 1; //millimeters per encoder count
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-        motorSpeeds[n] = (encoderReadings[n]-oldEncoderReadings[n])/loopTime;
+        motorSpeeds[n] = ((float)(encoderReadings[n]-oldEncoderReadings[n]))/loopTime*travelPerEncoderCount;
     }
-    ActualMotorSpeeds.left = min(motorSpeeds[0],motorSpeeds[1]);
-    ActualMotorSpeeds.right = min(motorSpeeds[3],motorSpeeds[5]);
+    CommandMotorSpeeds.left = 0;
+    CommandMotorSpeeds.right = 0;
+
+//probably wrong way around
+    ActualMotorSpeeds.right = minmagnitude(motorSpeeds[3],motorSpeeds[5],motorSpeeds[5]);
+    ActualMotorSpeeds.left = minmagnitude(motorSpeeds[0],motorSpeeds[1],motorSpeeds[1]);
+
+    CommandMotorSpeeds.left += kp*(TargetMotorSpeeds.left-ActualMotorSpeeds.left);
+    CommandMotorSpeeds.right += kp*(TargetMotorSpeeds.right-ActualMotorSpeeds.right);
 
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(CommandMotorSpeeds.left, -100, 100, 1000, 2000));
