@@ -16,10 +16,11 @@ extern "C" {
 Servo motorLeft;
 Servo motorRight;
 
-struct MotorSpeeds {
+struct Speeds {
     float left;
     float right;
-} CommandMotorSpeeds, TargetMotorSpeeds;
+} CommandMotorSpeeds, ActualMotorSpeeds, TargetMotorSpeeds;
+float lastLoopTime = millis();
 uint32_t missedMotorMessageCount = 0;
 
 SerialTransfer myTransfer;
@@ -42,6 +43,7 @@ Encoder encoders[NUM_ENCODERS] = {
 
 long encoderReadings[NUM_ENCODERS];
 long oldEncoderReadings[NUM_ENCODERS];
+float motorSpeeds[NUM_ENCODERS];
 
 void tcaselect(uint8_t i) {
     if (i > 7) {
@@ -54,6 +56,19 @@ void tcaselect(uint8_t i) {
 }
 
 #define sgn(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
+int i = (b) ? 0 : 1; // assign 0 to i if b is true, otherwise 1
+#define minmagnitude(x,y,z) {
+    float currentMin = x;
+    float currentMinMagnitude = abs(x);
+    if (abs(y) < currentMinMagnitude) {
+        currentMin = y;
+        currentMinMagnitude = abs(y)
+    }
+    if (abs(z) < currentMinMagnitude) {
+        currentMin = z;
+    }
+    return currentMin;
+}
 
 void setup() {
 #ifdef DEBUG
@@ -144,7 +159,7 @@ void loop() {
     TargetMotorSpeeds.right = TargetMotorSpeeds.right * maxspeed_mm_per_sec/100;
     TargetMotorSpeeds.left = TargetMotorSpeeds.left * maxspeed_mm_per_sec/100;
 
-    //convert speed commands into predcited power
+    //convert speed commands into predicted power
     float minTurnPower = 18;
     float minForwardPower = 8;
     float powerCoefficient = 113;
@@ -163,6 +178,15 @@ void loop() {
         CommandMotorSpeeds.right = 0;
         CommandMotorSpeeds.left = 0;
     }
+    // apply PID
+    float kp = 0.1;
+    float loopTime = millis()-lastLoopTime;
+    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+        motorSpeeds[n] = (encoderReadings[n]-oldEncoderReadings[n])/loopTime;
+    }
+    ActualMotorSpeeds.left = min(motorSpeeds[0],motorSpeeds[1]);
+    ActualMotorSpeeds.right = min(motorSpeeds[3],motorSpeeds[5]);
+
 
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(CommandMotorSpeeds.left, -100, 100, 1000, 2000));
@@ -204,6 +228,7 @@ void loop() {
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
             oldEncoderReadings[n] = encoderReadings[n];
             encoderReadings[n] = encoders[n].read();
+            lastLoopTime = millis();
         }
 
         uint16_t payloadSize = 0;
