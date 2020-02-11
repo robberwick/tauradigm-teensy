@@ -200,10 +200,6 @@ void loop() {
 
         motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
     }
-    
-    //command speeds set to zero here, just to test proportional alone without feedforward values calicualted above complicating it
-    commandMotorSpeeds.left = 0;
-    commandMotorSpeeds.right = 0;
 
     //probably wrong way around
     //most representative speed assumed to be slowest wheel
