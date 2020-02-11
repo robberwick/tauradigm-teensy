@@ -57,21 +57,19 @@ void tcaselect(uint8_t i) {
     Wire.endTransmission();
 }
 
-
 #define sgn(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
 
-float minmagnitude(float x, float y, float z){
+float minmagnitude(float x, float y, float z) {
     float currentMin = x;
     float currentMinMagnitude = abs(x);
     if (abs(y) < currentMinMagnitude) {
-        currentMin = y ;
+        currentMin = y;
         currentMinMagnitude = abs(y);
     }
     if (abs(z) < currentMinMagnitude) {
         currentMin = z;
     }
     return currentMin;
-
 }
 
 void setup() {
@@ -80,21 +78,17 @@ void setup() {
     // Setup serial comms
     // Show debug warning if debug flag is set
 
-
     Serial2.begin(1152000);
     while (!Serial2) {
     };
-
 
     // Attach motors
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
 
-
     myTransfer.begin(Serial2);
     TargetMotorSpeeds.left = 0;
     TargetMotorSpeeds.right = 0;
-
 
     // Initialise ToF sensors
     tcaselect(0);
@@ -110,7 +104,7 @@ void setup() {
             // instead, provide a desired inter-measurement period in
             // ms (e.g. sensor.startContinuous(100)).
             sensor.startContinuous();
-        } 
+        }
     }
 }
 
@@ -142,24 +136,24 @@ void loop() {
     Serial.println();
 #endif
     //convert -100 - +100 percentage speed command into mm/sec
-    float maxspeed_mm_per_sec = 1000; //max acheivable is 8000
-    TargetMotorSpeeds.right = TargetMotorSpeeds.right * maxspeed_mm_per_sec/100;
-    TargetMotorSpeeds.left = TargetMotorSpeeds.left * maxspeed_mm_per_sec/100;
+    float maxspeed_mm_per_sec = 1000;  //max acheivable is 8000
+    TargetMotorSpeeds.right = TargetMotorSpeeds.right * maxspeed_mm_per_sec / 100;
+    TargetMotorSpeeds.left = TargetMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
     //convert speed commands into predicted power
     float minTurnPower = 18;
     float minForwardPower = 8;
     float powerCoefficient = 113;
     float turnThreshold = 100;
-    if (TargetMotorSpeeds.left!=0 and TargetMotorSpeeds.right!=0){
-        if (abs(TargetMotorSpeeds.right-TargetMotorSpeeds.left)>turnThreshold) {
-            float turnComponent = sgn(TargetMotorSpeeds.right-TargetMotorSpeeds.left)*(abs(TargetMotorSpeeds.right-TargetMotorSpeeds.left)/powerCoefficient+minTurnPower);
-            float forwardComponent = (TargetMotorSpeeds.right+TargetMotorSpeeds.left)/2/powerCoefficient;
+    if (TargetMotorSpeeds.left != 0 and TargetMotorSpeeds.right != 0) {
+        if (abs(TargetMotorSpeeds.right - TargetMotorSpeeds.left) > turnThreshold) {
+            float turnComponent = sgn(TargetMotorSpeeds.right - TargetMotorSpeeds.left) * (abs(TargetMotorSpeeds.right - TargetMotorSpeeds.left) / powerCoefficient + minTurnPower);
+            float forwardComponent = (TargetMotorSpeeds.right + TargetMotorSpeeds.left) / 2 / powerCoefficient;
             CommandMotorSpeeds.right = turnComponent + forwardComponent;
             CommandMotorSpeeds.left = -turnComponent + forwardComponent;
         } else {
-            CommandMotorSpeeds.right = sgn(TargetMotorSpeeds.right)*abs(TargetMotorSpeeds.right)/powerCoefficient+minForwardPower;
-            CommandMotorSpeeds.left = sgn(TargetMotorSpeeds.left)*abs(TargetMotorSpeeds.left)/powerCoefficient+minForwardPower;
+            CommandMotorSpeeds.right = sgn(TargetMotorSpeeds.right) * abs(TargetMotorSpeeds.right) / powerCoefficient + minForwardPower;
+            CommandMotorSpeeds.left = sgn(TargetMotorSpeeds.left) * abs(TargetMotorSpeeds.left) / powerCoefficient + minForwardPower;
         }
     } else {
         CommandMotorSpeeds.right = 0;
@@ -167,21 +161,21 @@ void loop() {
     }
 
     // apply PID
-    float kp = 1/powerCoefficient;
-    float loopTime = (millis()-lastLoopTime)/1000; // divide by 1000 converts to seconds
-    float travelPerEncoderCount = 1; //millimeters per encoder count
+    float kp = 1 / powerCoefficient;
+    float loopTime = (millis() - lastLoopTime) / 1000;  // divide by 1000 converts to seconds
+    float travelPerEncoderCount = 1;                    //millimeters per encoder count
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-        motorSpeeds[n] = ((float)(encoderReadings[n]-oldEncoderReadings[n]))/loopTime*travelPerEncoderCount;
+        motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
     }
     CommandMotorSpeeds.left = 0;
     CommandMotorSpeeds.right = 0;
 
-//probably wrong way around
-    ActualMotorSpeeds.right = minmagnitude(motorSpeeds[3],motorSpeeds[5],motorSpeeds[5]);
-    ActualMotorSpeeds.left = minmagnitude(motorSpeeds[0],motorSpeeds[1],motorSpeeds[1]);
+    //probably wrong way around
+    ActualMotorSpeeds.right = minmagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
+    ActualMotorSpeeds.left = minmagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
 
-    CommandMotorSpeeds.left += kp*(TargetMotorSpeeds.left-ActualMotorSpeeds.left);
-    CommandMotorSpeeds.right += kp*(TargetMotorSpeeds.right-ActualMotorSpeeds.right);
+    CommandMotorSpeeds.left += kp * (TargetMotorSpeeds.left - ActualMotorSpeeds.left);
+    CommandMotorSpeeds.right += kp * (TargetMotorSpeeds.right - ActualMotorSpeeds.right);
 
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(CommandMotorSpeeds.left, -100, 100, 1000, 2000));
