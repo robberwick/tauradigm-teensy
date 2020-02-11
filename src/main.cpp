@@ -59,7 +59,7 @@ void tcaselect(uint8_t i) {
 
 #define sgn(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
 
-float minmagnitude(float x, float y, float z) {
+float minMagnitude(float x, float y, float z) {
     float currentMin = x;
     float currentMinMagnitude = abs(x);
     if (abs(y) < currentMinMagnitude) {
@@ -171,8 +171,8 @@ void loop() {
     commandMotorSpeeds.right = 0;
 
     //probably wrong way around
-    actualMotorSpeeds.right = minmagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
-    actualMotorSpeeds.left = minmagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
+    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
+    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
 
     commandMotorSpeeds.left += kp * (targetMotorSpeeds.left - actualMotorSpeeds.left);
     commandMotorSpeeds.right += kp * (targetMotorSpeeds.right - actualMotorSpeeds.right);
