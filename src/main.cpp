@@ -18,10 +18,11 @@ extern "C" {
 Servo motorLeft;
 Servo motorRight;
 
-struct MotorSpeeds {
+struct Speeds {
     float left;
     float right;
-} motorSpeeds;
+} CommandMotorSpeeds, ActualMotorSpeeds, TargetMotorSpeeds;
+float lastLoopTime = millis();
 uint32_t missedMotorMessageCount = 0;
 
 SerialTransfer myTransfer;
@@ -43,6 +44,8 @@ Encoder encoders[NUM_ENCODERS] = {
     Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)};
 
 long encoderReadings[NUM_ENCODERS];
+long oldEncoderReadings[NUM_ENCODERS];
+float motorSpeeds[NUM_ENCODERS];
 
 Adafruit_SSD1306 display(128, 64);
 
@@ -56,23 +59,21 @@ void tcaselect(uint8_t i) {
     Wire.endTransmission();
 }
 
-void haltAndCatchFire() {
-    while (1) {
-    }
-}
 
-void do_i2c_scan() {
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("I2c Devices");
-    for (uint8_t addr = 1; addr <= 127; addr++) {
-        uint8_t data;
-        if (!twi_writeTo(addr, &data, 0, 1, 1)) {
-            display.print("0x");
-            display.println(addr, HEX);
-        }
+#define sgn(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
+int i = (b) ? 0 : 1; // assign 0 to i if b is true, otherwise 1
+#define minmagnitude(x,y,z) {
+    float currentMin = x;
+    float currentMinMagnitude = abs(x);
+    if (abs(y) < currentMinMagnitude) {
+        currentMin = y;
+        currentMinMagnitude = abs(y)
     }
-    display.display();
+    if (abs(z) < currentMinMagnitude) {
+        currentMin = z;
+    }
+    return currentMin;
+
 }
 
 void setup() {
@@ -128,23 +129,12 @@ void setup() {
     display.println(F("Motors"));
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
-    // Initialise motor speeds
-    motorSpeeds.left = 0;
-    motorSpeeds.right = 0;
-    display.setCursor(0, 10);
-    display.print("OK");
-    display.display();
-    delay(1000);
 
-    // Initialise serial transfer
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("Serial transfer"));
-    display.setCursor(0, 10);
-    display.print("OK");
+
     myTransfer.begin(Serial2);
-    display.display();
-    delay(1000);
+    TargetMotorSpeeds.left = 0;
+    TargetMotorSpeeds.right = 0;
+
 
     // Initialise ToF sensors
     tcaselect(0);
@@ -188,20 +178,59 @@ void loop() {
             // reset missing motor message count
             missedMotorMessageCount = 0;
             uint8_t recSize = 0;
-            myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
+            myTransfer.rxObj(TargetMotorSpeeds, sizeof(TargetMotorSpeeds), recSize);
         } else {
             missedMotorMessageCount++;
         }
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
-        motorSpeeds.left = 0;
-        motorSpeeds.right = 0;
+        TargetMotorSpeeds.left = 0;
+        TargetMotorSpeeds.right = 0;
     }
 
+#ifdef DEBUG
+    Serial.print(TargetMotorSpeeds.left);
+    Serial.print(' ');
+    Serial.print(TargetMotorSpeeds.right);
+    Serial.println();
+#endif
+    //convert -100 - +100 percentage speed command into mm/sec
+    float maxspeed_mm_per_sec = 1000; //max acheivable is 8000
+    TargetMotorSpeeds.right = TargetMotorSpeeds.right * maxspeed_mm_per_sec/100;
+    TargetMotorSpeeds.left = TargetMotorSpeeds.left * maxspeed_mm_per_sec/100;
+
+    //convert speed commands into predicted power
+    float minTurnPower = 18;
+    float minForwardPower = 8;
+    float powerCoefficient = 113;
+    float turnThreshold = 100;
+    if (TargetMotorSpeeds.left!=0 and TargetMotorSpeeds.right!=0){
+        if (abs(TargetMotorSpeeds.right-TargetMotorSpeeds.left)>turnThreshold) {
+            float turnComponent = sgn(TargetMotorSpeeds.right-TargetMotorSpeeds.left)*(abs(TargetMotorSpeeds.right-TargetMotorSpeeds.left)/powerCoefficient+minTurnPower);
+            float forwardComponent = (TargetMotorSpeeds.right+TargetMotorSpeeds.left)/2/powerCoefficient;
+            CommandMotorSpeeds.right = turnComponent + forwardComponent;
+            CommandMotorSpeeds.left = -turnComponent + forwardComponent;
+        } else {
+            CommandMotorSpeeds.right = sgn(TargetMotorSpeeds.right)*abs(TargetMotorSpeeds.right)/powerCoefficient+minForwardPower;
+            CommandMotorSpeeds.left =sgn(TargetMotorSpeeds.left)*abs(TargetMotorSpeeds.left)/powerCoefficient+minForwardPower;
+        }
+    } else {
+        CommandMotorSpeeds.right = 0;
+        CommandMotorSpeeds.left = 0;
+    }
+    // apply PID
+    float kp = 0.1;
+    float loopTime = millis()-lastLoopTime;
+    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+        motorSpeeds[n] = (encoderReadings[n]-oldEncoderReadings[n])/loopTime;
+    }
+    ActualMotorSpeeds.left = min(motorSpeeds[0],motorSpeeds[1]);
+    ActualMotorSpeeds.right = min(motorSpeeds[3],motorSpeeds[5]);
+
     // Write motorspeeds
-    motorLeft.writeMicroseconds(map(motorSpeeds.left, -100, 100, 1000, 2000));
-    motorRight.writeMicroseconds(map(motorSpeeds.right * -1, -100, 100, 1000, 2000));
+    motorLeft.writeMicroseconds(map(CommandMotorSpeeds.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(CommandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
@@ -219,8 +248,11 @@ void loop() {
         }
 
         /// Read Encoder counts
+
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+            oldEncoderReadings[n] = encoderReadings[n];
             encoderReadings[n] = encoders[n].read();
+            lastLoopTime = millis();
         }
 
         uint16_t payloadSize = 0;
