@@ -21,8 +21,8 @@ Servo motorRight;
 struct Speeds {
     float left;
     float right;
-} commandMotorSpeeds, actualMotorSpeeds, targetMotorSpeeds;
-float lastLoopTime = millis();
+} commandMotorSpeeds, actualMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds;
+long lastLoopTime = millis();
 uint32_t missedMotorMessageCount = 0;
 
 SerialTransfer myTransfer;
@@ -90,8 +90,13 @@ void setup() {
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
 
     myTransfer.begin(Serial2);
-    targetMotorSpeeds.left = 0;
-    targetMotorSpeeds.right = 0;
+    requestedMotorSpeeds.left = 0;
+    requestedMotorSpeeds.right = 0;
+
+    //initialise oldEncoderReadings so first loop has valid values
+    for (uint8_t n = 0; n < NUM_ENCODERS; n++) {
+        oldEncoderReadings[n]=0;
+    }
 
     // Initialise ToF sensors
     tcaselect(0);
@@ -121,21 +126,21 @@ void loop() {
             // reset missing motor message count
             missedMotorMessageCount = 0;
             uint8_t recSize = 0;
-            myTransfer.rxObj(targetMotorSpeeds, sizeof(targetMotorSpeeds), recSize);
+            myTransfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), recSize);
         } else {
             missedMotorMessageCount++;
         }
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
-        targetMotorSpeeds.left = 0;
-        targetMotorSpeeds.right = 0;
+        requestedMotorSpeeds.left = 0;
+        requestedMotorSpeeds.right = 0;
     }
 
 #ifdef DEBUG
-    Serial.print(targetMotorSpeeds.left);
+    Serial.print(requestedMotorSpeeds.left);
     Serial.print(' ');
-    Serial.print(targetMotorSpeeds.right);
+    Serial.print(requestedMotorSpeeds.right);
     Serial.println();
 #endif
     //convert -100 - +100 percentage speed command into mm/sec
@@ -143,8 +148,8 @@ void loop() {
     // but for manual control, and for testing speedcontrol precision
     // better to start with limiting to lower speeds 
     float maxspeed_mm_per_sec = 1000;  //max acheivable is 8000
-    targetMotorSpeeds.right = targetMotorSpeeds.right * maxspeed_mm_per_sec / 100;
-    targetMotorSpeeds.left = targetMotorSpeeds.left * maxspeed_mm_per_sec / 100;
+    targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
+    targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
     //convert speed commands into predicted power
     //otherwise known as feedforward. We can do feedforward
@@ -182,15 +187,17 @@ void loop() {
     }
 
     // apply PID
-    //or at the moment, just proportional. i.e power percentage proporational
+    //or at the moment, just proportional
+    //. i.e power percentage proporational
     // to difference between desired speed and current actual wheel speed
-    float kp = 1 / powerCoefficient;  //ie. how much power to use for a given speed error
-    float loopTime = (millis() - lastLoopTime) / 1000;  // divide by 1000 converts to seconds.
+    float kp = 10 / powerCoefficient;  //ie. how much power to use for a given speed error
+    float loopTime = 0.025; //(millis()*0.001 - lastLoopTime*0.001);  // divide by 1000 converts to seconds.
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
 
     //compare old and latest encoder readings to see how much each wheel has rotated
     //speed is distance/time and should be a float in mm/sec 
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+
         motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
     }
     
@@ -213,8 +220,12 @@ void loop() {
     // which happens to be the minimum forward power. so a max speed command should only *just*
     //cause the bot to move. from testing power 8 should give a speed of 0-100mm/s.
     // current code gives 0 to ~300mm/s spurts
-    commandMotorSpeeds.left += kp * (targetMotorSpeeds.left - actualMotorSpeeds.left);
-    commandMotorSpeeds.right += kp * (targetMotorSpeeds.right - actualMotorSpeeds.right);
+    commandMotorSpeeds.left = kp * (targetMotorSpeeds.left - actualMotorSpeeds.left);
+    commandMotorSpeeds.right = kp * (targetMotorSpeeds.right - actualMotorSpeeds.right);
+
+    //constrain output
+    commandMotorSpeeds.left =max(min(commandMotorSpeeds.left, 100), -100);
+    commandMotorSpeeds.right =-max(min(commandMotorSpeeds.right, 100), -100);
 
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
@@ -234,7 +245,15 @@ void loop() {
                 distances[t] = 0;
             }
         }
-
+        // stash key motor speed variables in ToF variable to get into log file
+        distances[0] = targetMotorSpeeds.left;
+        distances[1] = targetMotorSpeeds.right;
+        distances[2] = motorSpeeds[0];  //nan, 0  or inf, or XX,XXX
+        distances[3] = motorSpeeds[1];
+        distances[4] = motorSpeeds[3];
+        distances[5] = motorSpeeds[5];
+        distances[6] = commandMotorSpeeds.left;
+        distances[7] = commandMotorSpeeds.right;
         /// Read Encoder counts
 
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
