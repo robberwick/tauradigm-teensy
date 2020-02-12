@@ -75,6 +75,53 @@ float minMagnitude(float x, float y, float z) {
     return currentMin;
 }
 
+float feedForward(struct speeds requestedSpeeds){
+    // takes two speed commands in -100 to +100%
+    // returns predicted motor power -100 to +100%
+    //inputs and outputs both Speed structs
+
+    struct Speeds commandSpeeds, targetSpeeds;
+
+    //convert -100 - +100 percentage speed command into mm/sec
+    // for autonomous control we could revert back to using full scale
+    // but for manual control, and for testing speedcontrol precision
+    // better to start with limiting to lower speeds  
+    float maxspeed_mm_per_sec = 1000;  //max acheivable is 8000
+    targetSpeeds.right = -requestedSpeeds.right * maxspeed_mm_per_sec / 100;
+    targetSpeeds.left = requestedSpeeds.left * maxspeed_mm_per_sec / 100;
+
+    float minTurnPower = 18;  //determined from practical testing
+    float minForwardPower = 8;  //same
+    float powerCoefficient = 113;  //same
+    float turnThreshold = 100;  //units: mm/sec. arbitary, value. 
+    // using the turnThreshold does create a discontinuity when transitioning
+    // from mostly straight ahead to a slight turn but then the two moves
+    // do need different power outputs. maybe linear interpolation between
+    // the two would be better?  
+
+   // since there's a min power needed to move (as defined above)
+   // first check if we're trying to move  
+    if (targetSpeeds.left != 0 and targetSpeeds.right != 0) {
+        //then check if we're trying to turn or not, i.e. left and right speeds different
+        if (abs(targetSpeeds.right - targetSpeeds.left) > turnThreshold) {
+            //then predict power needed to acheive that speed. formule derived from curve fitting experimental results
+            float turnComponent = sgn(targetSpeeds.right - targetSpeeds.left) * (abs(targetSpeeds.right - targetMotorSpeeds.left) / powerCoefficient + minTurnPower);
+            float forwardComponent = (targetSpeeds.right + targetSpeeds.left) / 2 / powerCoefficient;
+            commandSpeeds.right = turnComponent + forwardComponent;
+            commandSpeeds.left = -turnComponent + forwardComponent;
+        } else {
+            //a different formula is best fit for going straight
+            commandSpeeds.right = sgn(targetSpeeds.right) * abs(targetSpeeds.right) / powerCoefficient + minForwardPower;
+            commandSpeeds.left = sgn(targetSpeeds.left) * abs(targetSpeeds.left) / powerCoefficient + minForwardPower;
+        }
+    } else {
+        //if we're not trying to move, turn the motors off
+        commandSpeeds.right = 0;
+        commandSpeeds.left = 0;
+    }
+    return commandSpeeds;
+}
+
 void setup() {
     // Initialise I2C bus
     Wire.begin();
@@ -143,53 +190,16 @@ void loop() {
     Serial.print(requestedMotorSpeeds.right);
     Serial.println();
 #endif
-    //convert -100 - +100 percentage speed command into mm/sec
-    // for autonomous control we could revert back to using full scale
-    // but for manual control, and for testing speedcontrol precision
-    // better to start with limiting to lower speeds 
-    float maxspeed_mm_per_sec = 1000;  //max acheivable is 8000
-    targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
-    targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
-
     //convert speed commands into predicted power
-    //otherwise known as feedforward. We can do feedforward
+    // otherwise known as feedforward. We can do feedforward
     // and/or PID speed control. both is better but either
-    // alone should give functional results currently neither does 
-
-    float minTurnPower = 18;  //determined from practical testing
-    float minForwardPower = 8;  //same
-    float powerCoefficient = 113;  //same
-    float turnThreshold = 100;  //units: mm/sec. arbitary, value. 
-    // using the turnThreshold does create a discontinuity when transitioning
-    // from mostly straight ahead to a slight turn but then the two moves
-    // do need different power outputs. maybe linear interpolation between
-    // the two would be better?  
-
-   // since there's a min power needed to move (as defined above)
-   // first check if we're trying to move  
-    if (targetMotorSpeeds.left != 0 and targetMotorSpeeds.right != 0) {
-        //then check if we're trying to turn or not, i.e. left and right speeds different
-        if (abs(targetMotorSpeeds.right - targetMotorSpeeds.left) > turnThreshold) {
-            //then predict power needed to acheive that speed. formule dervied from curve fitting experimental results
-            float turnComponent = sgn(targetMotorSpeeds.right - targetMotorSpeeds.left) * (abs(targetMotorSpeeds.right - targetMotorSpeeds.left) / powerCoefficient + minTurnPower);
-            float forwardComponent = (targetMotorSpeeds.right + targetMotorSpeeds.left) / 2 / powerCoefficient;
-            commandMotorSpeeds.right = turnComponent + forwardComponent;
-            commandMotorSpeeds.left = -turnComponent + forwardComponent;
-        } else {
-            //a different formula is best fit for going straight
-            commandMotorSpeeds.right = sgn(targetMotorSpeeds.right) * abs(targetMotorSpeeds.right) / powerCoefficient + minForwardPower;
-            commandMotorSpeeds.left = sgn(targetMotorSpeeds.left) * abs(targetMotorSpeeds.left) / powerCoefficient + minForwardPower;
-        }
-    } else {
-        //if we're not trying to move, turn the motors off
-        commandMotorSpeeds.right = 0;
-        commandMotorSpeeds.left = 0;
-    }
+    // alone gives functional results 
+    commandMotorSpeeds = feedForward(requestedMotorSpeeds);
 
     // apply PID
-    //or at the moment, just proportional
-    //. i.e power percentage proporational
-    // to difference between desired speed and current actual wheel speed
+    // or at the moment, just proportional
+    //. i.e power percentage proporational to difference
+    // between desired speed and current actual wheel speed
     float kp = 10 / powerCoefficient;  //ie. how much power to use for a given speed error
     float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
