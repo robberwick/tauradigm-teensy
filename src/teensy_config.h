@@ -31,3 +31,6 @@
 
 // hardware counts
 #define NUM_ENCODERS 6
+
+// timing constants
+#define BNO055_SAMPLERATE_DELAY_MS (100)
