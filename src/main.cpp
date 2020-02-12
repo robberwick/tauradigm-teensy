@@ -191,7 +191,8 @@ void loop() {
     //. i.e power percentage proporational
     // to difference between desired speed and current actual wheel speed
     float kp = 10 / powerCoefficient;  //ie. how much power to use for a given speed error
-    float loopTime = 0.025; //(millis()*0.001 - lastLoopTime*0.001);  // divide by 1000 converts to seconds.
+    float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
+    lastLoopTime = millis();
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
 
     //compare old and latest encoder readings to see how much each wheel has rotated
@@ -200,8 +201,7 @@ void loop() {
 
         motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
     }
-
-    //probably wrong way around
+    
     //most representative speed assumed to be slowest wheel
     //#0 & #1 known to be on one side of bot, #3 & #5 on the other
     //at the moment, I'm not sure which is is which though...
@@ -210,12 +210,6 @@ void loop() {
 
     // do actual Proportional calc.
     //speed error is target - actual.
-    //example: command speed 1000mm/s (max practical speed)
-    //actual speed 100mm/s
-    //proportional calc gives (1000-100)*1/113 = 8,
-    // which happens to be the minimum forward power. so a max speed command should only *just*
-    //cause the bot to move. from testing power 8 should give a speed of 0-100mm/s.
-    // current code gives 0 to ~300mm/s spurts
     commandMotorSpeeds.left = kp * (targetMotorSpeeds.left - actualMotorSpeeds.left);
     commandMotorSpeeds.right = kp * (targetMotorSpeeds.right - actualMotorSpeeds.right);
 
@@ -241,23 +235,21 @@ void loop() {
                 distances[t] = 0;
             }
         }
-        // stash key motor speed variables in ToF variable to get into log file
+        // stash key motor speed variables in ToF variable to get into log file for speed control tuning
         distances[0] = targetMotorSpeeds.left;
         distances[1] = targetMotorSpeeds.right;
-        distances[2] = motorSpeeds[0];  //nan, 0  or inf, or XX,XXX
+        distances[2] = motorSpeeds[0];
         distances[3] = motorSpeeds[1];
         distances[4] = motorSpeeds[3];
         distances[5] = motorSpeeds[5];
         distances[6] = commandMotorSpeeds.left;
         distances[7] = commandMotorSpeeds.right;
+      
         /// Read Encoder counts
-
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
             //stash old encoder readings so we know how much it changed this loop
             oldEncoderReadings[n] = encoderReadings[n];
             encoderReadings[n] = encoders[n].read();
-            //stash time encoders were read, so we can work out the speed
-            lastLoopTime = millis();
         }
 
         uint16_t payloadSize = 0;
