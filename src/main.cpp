@@ -75,20 +75,12 @@ float minMagnitude(float x, float y, float z) {
     return currentMin;
 }
 
-float feedForward(struct speeds requestedSpeeds){
-    // takes two speed commands in -100 to +100%
+struct Speeds feedForward(struct Speeds targetSpeeds){
+    // takes two speed commands in mm/sec
     // returns predicted motor power -100 to +100%
     //inputs and outputs both Speed structs
 
-    struct Speeds commandSpeeds, targetSpeeds;
-
-    //convert -100 - +100 percentage speed command into mm/sec
-    // for autonomous control we could revert back to using full scale
-    // but for manual control, and for testing speedcontrol precision
-    // better to start with limiting to lower speeds  
-    float maxspeed_mm_per_sec = 1000;  //max acheivable is 8000
-    targetSpeeds.right = -requestedSpeeds.right * maxspeed_mm_per_sec / 100;
-    targetSpeeds.left = requestedSpeeds.left * maxspeed_mm_per_sec / 100;
+    struct Speeds commandSpeeds;
 
     float minTurnPower = 18;  //determined from practical testing
     float minForwardPower = 8;  //same
@@ -194,13 +186,21 @@ void loop() {
     // otherwise known as feedforward. We can do feedforward
     // and/or PID speed control. both is better but either
     // alone gives functional results 
-    commandMotorSpeeds = feedForward(requestedMotorSpeeds);
 
+    //convert -100 - +100 percentage speed command into mm/sec
+    // for autonomous control we could revert back to using full scale
+    // but for manual control, and for testing speedcontrol precision
+    // better to start with limiting to lower speeds  
+    float maxspeed_mm_per_sec = 2000;  //max acheivable is 8000
+    targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
+    targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
+
+    commandMotorSpeeds = feedForward(targetMotorSpeeds);
     // apply PID
     // or at the moment, just proportional
     //. i.e power percentage proporational to difference
     // between desired speed and current actual wheel speed
-    float kp = 10 / powerCoefficient;  //ie. how much power to use for a given speed error
+    float kp = 0.1;  //ie. how much power to use for a given speed error
     float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
