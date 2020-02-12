@@ -3,6 +3,7 @@
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <Chrono.h>
+#include <EEPROM.h>
 #include <Encoder.h>
 #include <SerialTransfer.h>
 #include <Servo.h>
@@ -190,33 +191,92 @@ void setup() {
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("IMU"));
+    // Do we have an IMU
     if (!bno.begin()) {
         display.println("FAIL");
     } else {
         display.println("OK");
-    }
-    uint8_t system, gyro, accel, mag;
-    system = gyro = accel = mag = 0;
 
-    u_int8_t curYPos = display.getCursorY();
-    while (!system) {
-        bno.getCalibration(&system, &gyro, &accel, &mag);
-        display.setCursor(0, curYPos);
-        /* Display the individual values */
-        display.print("Sys:");
-        display.print(system, DEC);
-        display.print(" G:");
-        display.print(gyro, DEC);
-        display.print(" A:");
-        display.print(accel, DEC);
-        display.print(" M:");
-        display.println(mag, DEC);
+        // look for calibration data. if it exists, load it.
+        // if not, calibrate then store the data in the EEPROM
+        int eeAddress = 0;
+        long bnoID;
+        bool foundCalib = false;
+        EEPROM.get(eeAddress, bnoID);
+
+        adafruit_bno055_offsets_t calibrationData;
+        sensor_t sensor;
+
+        bno.getSensor(&sensor);
+        if (bnoID != sensor.sensor_id) {
+            display.println("No Calibration Data in EEPROM");
+
+        } else {
+            display.println("Found Calibration in EEPROM.");
+            eeAddress += sizeof(long);
+            EEPROM.get(eeAddress, calibrationData);
+
+            display.println("Restoring...");
+            bno.setSensorOffsets(calibrationData);
+
+            display.println("Restored");
+            foundCalib = true;
+        }
         display.display();
-    };
-    display.println("calibrated OK");
-    display.display();
-    delay(2000);
+        delay(3000);
+
+        display.clearDisplay();
+        sensors_event_t event;
+        bno.getEvent(&event);
+        if (foundCalib) {
+            display.println("Move sensor slightly to calibrate magnetometers");
+            while (!bno.isFullyCalibrated()) {
+                bno.getEvent(&event);
+                delay(BNO055_SAMPLERATE_DELAY_MS);
+            }
+        } else {
+            display.println("Please Calibrate Sensor: ");
+            u_int8_t curYPos = display.getCursorY();
+            while (!bno.isFullyCalibrated()) {
+                bno.getEvent(&event);
+
+                display.setCursor(0, curYPos);
+                /* Display the individual values */
+                display.print("X:");
+                display.print(event.orientation.x, 4);
+                display.print(" Y:");
+                display.print(event.orientation.y, 4);
+                display.print(" Z:");
+                display.print(event.orientation.z, 4);
+                display.display();
+
+                /* Wait the specified delay before requesting new data */
+                delay(BNO055_SAMPLERATE_DELAY_MS);
+            }
+        }
+        display.println("calibrated OK");
+        display.display();
+
+        adafruit_bno055_offsets_t newCalib;
+        bno.getSensorOffsets(newCalib);
+
+        display.println("Storing calibration data to EEPROM...");
+
+        eeAddress = 0;
+        bno.getSensor(&sensor);
+        bnoID = sensor.sensor_id;
+
+        EEPROM.put(eeAddress, bnoID);
+
+        eeAddress += sizeof(long);
+        EEPROM.put(eeAddress, newCalib);
+        display.println("Data stored to EEPROM.");
+
+        delay(2000);
+    }
+
     display.clearDisplay();
+    display.println("Running");
     display.display();
 }
 
@@ -233,7 +293,7 @@ void loop() {
             myTransfer.rxObj(motorSpeeds, sizeof(motorSpeeds), recSize);
         } else {
             missedMotorMessageCount++;
-        }   
+        }
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
@@ -272,7 +332,6 @@ void loop() {
         orientationReading.x = orientationData.orientation.x;
         orientationReading.y = orientationData.orientation.y;
         orientationReading.z = orientationData.orientation.z;
-
 
         uint16_t payloadSize = 0;
 
