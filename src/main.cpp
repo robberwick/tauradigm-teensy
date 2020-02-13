@@ -12,6 +12,7 @@
 #include "Wire.h"
 #include "graphics.h"
 #include "teensy_config.h"
+#include "post.h"
 
 extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
@@ -226,16 +227,20 @@ void setup() {
         delay(3000);
 
         display.clearDisplay();
+        display.setCursor(0, 0);
+        
         sensors_event_t event;
         bno.getEvent(&event);
         if (foundCalib) {
             display.println("Move sensor slightly to calibrate magnetometers");
+            display.display();
             while (!bno.isFullyCalibrated()) {
                 bno.getEvent(&event);
                 delay(BNO055_SAMPLERATE_DELAY_MS);
             }
         } else {
             display.println("Please Calibrate Sensor: ");
+            display.display();
             u_int8_t curYPos = display.getCursorY();
             while (!bno.isFullyCalibrated()) {
                 bno.getEvent(&event);
