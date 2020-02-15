@@ -17,7 +17,7 @@ extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
 
-#define DEBUG
+// #define DEBUG
 
 Servo motorLeft;
 Servo motorRight;
