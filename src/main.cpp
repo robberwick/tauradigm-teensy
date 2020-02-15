@@ -21,7 +21,7 @@ Servo motorRight;
 struct Speeds {
     float left;
     float right;
-} commandMotorSpeeds, actualMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds;
+} commandMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds;
 long lastLoopTime = millis();
 uint32_t missedMotorMessageCount = 0;
 
@@ -45,7 +45,7 @@ Encoder encoders[NUM_ENCODERS] = {
 
 long encoderReadings[NUM_ENCODERS];
 long oldEncoderReadings[NUM_ENCODERS];
-float motorSpeeds[NUM_ENCODERS];
+
 
 void tcaselect(uint8_t i) {
     if (i > 7) {
@@ -114,13 +114,56 @@ struct Speeds feedForward(struct Speeds targetSpeeds){
     return commandSpeeds;
 }
 
+struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
+   // apply PID
+    // takes two speed commands in -100 to +100 and two
+    // target speeds in mm/sec
+    // uses sensor feedback to correct for errors 
+    // returns motor power -100 to +100%
+    //inputs and outputs all Speed structs
+
+    // or at the moment, just proportional
+    //. i.e power percentage proporational to difference
+    // between desired speed and current actual wheel speed
+    float kp = 0.03;  //ie. how much power to use for a given speed error
+    float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
+    lastLoopTime = millis();
+    float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
+
+    //compare old and latest encoder readings to see how much each wheel has rotated
+    //speed is distance/time and should be a float in mm/sec 
+    float motorSpeeds[NUM_ENCODERS];
+    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+        motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
+    }
+    
+    //most representative speed assumed to be slowest wheel
+    //#0 & #1 known to be on one side of bot, #3 & #5 on the other
+    //at the moment, I'm not sure which is is which though...
+    struct Speeds actualMotorSpeeds;
+    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
+    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
+
+    // do actual Proportional calc.
+    //speed error is target - actual.
+    commandSpeeds.left = kp * (targetSpeeds.left - actualMotorSpeeds.left);
+    commandSpeeds.right = kp * (targetSpeeds.right - actualMotorSpeeds.right);
+
+    //constrain output
+    float max_power=50;
+    commandSpeeds.left =max(min(commandSpeeds.left, max_power), -max_power);
+    commandSpeeds.right =-max(min(commandSpeeds.right, max_power), -max_power);
+
+    return commandSpeeds;
+}
+
 void setup() {
     // Initialise I2C bus
     Wire.begin();
     // Setup serial comms
     // Show debug warning if debug flag is set
 
-    Serial2.begin(1152000);
+    Serial2.begin(115200);
     while (!Serial2) {
     };
 
@@ -195,38 +238,12 @@ void loop() {
     targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
+    //get predicted motor powers from feedforward
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
-    // apply PID
-    // or at the moment, just proportional
-    //. i.e power percentage proporational to difference
-    // between desired speed and current actual wheel speed
-    float kp = 0.03;  //ie. how much power to use for a given speed error
-    float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
-    lastLoopTime = millis();
-    float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
 
-    //compare old and latest encoder readings to see how much each wheel has rotated
-    //speed is distance/time and should be a float in mm/sec 
-    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-
-        motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
-    }
-    
-    //most representative speed assumed to be slowest wheel
-    //#0 & #1 known to be on one side of bot, #3 & #5 on the other
-    //at the moment, I'm not sure which is is which though...
-    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
-    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
-
-    // do actual Proportional calc.
-    //speed error is target - actual.
-    commandMotorSpeeds.left = kp * (targetMotorSpeeds.left - actualMotorSpeeds.left);
-    commandMotorSpeeds.right = kp * (targetMotorSpeeds.right - actualMotorSpeeds.right);
-
-    //constrain output
-    float max_power=50;
-    commandMotorSpeeds.left =max(min(commandMotorSpeeds.left, max_power), -max_power);
-    commandMotorSpeeds.right =-max(min(commandMotorSpeeds.right, max_power), -max_power);
+    //apply PID to motor powers based on deviation from target speed
+    commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
+ 
 
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
@@ -246,16 +263,7 @@ void loop() {
                 distances[t] = 0;
             }
         }
-        // stash key motor speed variables in ToF variable to get into log file for speed control tuning
-        distances[0] = targetMotorSpeeds.left;
-        distances[1] = targetMotorSpeeds.right;
-        distances[2] = motorSpeeds[0];
-        distances[3] = motorSpeeds[1];
-        distances[4] = motorSpeeds[3];
-        distances[5] = motorSpeeds[5];
-        distances[6] = commandMotorSpeeds.left;
-        distances[7] = commandMotorSpeeds.right;
-      
+        
         /// Read Encoder counts
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
             //stash old encoder readings so we know how much it changed this loop
