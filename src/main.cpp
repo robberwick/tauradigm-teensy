@@ -191,7 +191,7 @@ void loop() {
     // for autonomous control we could revert back to using full scale
     // but for manual control, and for testing speedcontrol precision
     // better to start with limiting to lower speeds  
-    float maxspeed_mm_per_sec = 2000;  //max acheivable is 8000
+    float maxspeed_mm_per_sec = 3000;  //max acheivable is 8000
     targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
@@ -200,7 +200,7 @@ void loop() {
     // or at the moment, just proportional
     //. i.e power percentage proporational to difference
     // between desired speed and current actual wheel speed
-    float kp = 0.1;  //ie. how much power to use for a given speed error
+    float kp = 0.03;  //ie. how much power to use for a given speed error
     float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
@@ -224,8 +224,9 @@ void loop() {
     commandMotorSpeeds.right = kp * (targetMotorSpeeds.right - actualMotorSpeeds.right);
 
     //constrain output
-    commandMotorSpeeds.left =max(min(commandMotorSpeeds.left, 100), -100);
-    commandMotorSpeeds.right =-max(min(commandMotorSpeeds.right, 100), -100);
+    float max_power=50;
+    commandMotorSpeeds.left =max(min(commandMotorSpeeds.left, max_power), -max_power);
+    commandMotorSpeeds.right =-max(min(commandMotorSpeeds.right, max_power), -max_power);
 
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
