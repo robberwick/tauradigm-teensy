@@ -26,6 +26,8 @@ long lastLoopTime = millis();
 
 uint32_t missedMotorMessageCount = 0;
 
+float minBatVoltage = 11.1;
+
 SerialTransfer myTransfer;
 
 int8_t step = 1;
@@ -75,6 +77,19 @@ float minMagnitude(float x, float y, float z) {
         currentMin = z;
     }
     return currentMin;
+}
+
+float batteryVoltage(){
+    //reads ADC, interprets it and 
+    //returns battery voltage as a float
+    float ADC, voltage;
+    //AnalogRead returns 10bit fraction of Vdd
+    ADC = analogRead(TEENSY_PIN_BATT_SENSE)*3.3/1023.0;
+
+     //ADC reads battery via a potential divider of 33k and 10k
+     //but they're wrong/outof spec
+    voltage = ADC * (26.9+10.0)/10.0;
+    return voltage;
 }
 
 struct Speeds feedForward(struct Speeds targetSpeeds){
@@ -200,6 +215,12 @@ void setup() {
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
     display.display();
     delay(3000);
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println("Battery Voltage:");
+    display.printf("%2.2f V", batteryVoltage());
+    display.display();
+    delay(2000);
 
     // Setup serial comms
     // Show debug warning if debug flag is set
@@ -298,6 +319,11 @@ void loop() {
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
+        requestedMotorSpeeds.left = 0;
+        requestedMotorSpeeds.right = 0;
+    }
+    // is battery going flat?
+    if (batteryVoltage() < minBatVoltage) {
         requestedMotorSpeeds.left = 0;
         requestedMotorSpeeds.right = 0;
     }
