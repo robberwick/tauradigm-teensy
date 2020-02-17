@@ -1,5 +1,6 @@
 #include <Adafruit_SSD1306.h>
 #include <Arduino.h>
+#include <unordered_map>
 #include <Chrono.h>
 #include <Encoder.h>
 #include <SerialTransfer.h>
@@ -13,7 +14,7 @@ extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
 
-#define DEBUG
+//#define DEBUG
 
 Servo motorLeft;
 Servo motorRight;
@@ -54,7 +55,7 @@ void tcaselect(uint8_t i) {
         return;
     }
 
-    Wire.beginTransmission(TCAADDR);
+    Wire.beginTransmission(TCA_ADDR);
     Wire.write(1 << i);
     Wire.endTransmission();
 }
@@ -171,8 +172,14 @@ void do_i2c_scan() {
     for (uint8_t addr = 1; addr <= 127; addr++) {
         uint8_t data;
         if (!twi_writeTo(addr, &data, 0, 1, 1)) {
-            display.print("0x");
-            display.println(addr, HEX);
+            //C++20 has a contains() method for unordered_map
+            // but find() is only one available to us?    
+            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()){
+                display.println(I2C_ADDRESS_NAMES.at(addr));
+            } else {
+                display.print("0x");
+                display.println(addr, HEX);
+            }
         }
     }
     display.display();
@@ -223,7 +230,7 @@ void setup() {
 
     // do i2c scan
     do_i2c_scan();
-    delay(2000);
+    delay(3000);
 
     // Attach motors
     display.clearDisplay();
