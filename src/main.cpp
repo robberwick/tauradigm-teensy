@@ -224,7 +224,7 @@ void setup() {
     };
 #endif
 
-    Serial2.begin(1152000);
+    Serial2.begin(115200);
     while (!Serial2) {
     };
 
