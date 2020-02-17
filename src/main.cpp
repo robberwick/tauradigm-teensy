@@ -13,7 +13,7 @@ extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
 
-#define DEBUG
+//#define DEBUG
 
 Servo motorLeft;
 Servo motorRight;
@@ -217,7 +217,7 @@ void setup() {
     };
 #endif
 
-    Serial2.begin(1152000);
+    Serial2.begin(115200);
     while (!Serial2) {
     };
 
