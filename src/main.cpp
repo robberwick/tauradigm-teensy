@@ -131,41 +131,46 @@ void setup() {
 
     // do i2c scan
     do_i2c_scan();
-    delay(2000);
+    delay(3000);
 
     // Attach motors
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("Motors"));
+    display.display();
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
     // Initialise motor speeds
     motorSpeeds.left = 0;
     motorSpeeds.right = 0;
-    display.setCursor(0, 10);
     display.print("OK");
     display.display();
-    delay(1000);
+    delay(3000);
 
     // Initialise serial transfer
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("Serial transfer"));
-    display.setCursor(0, 10);
+
+    display.display();
     display.print("OK");
     myTransfer.begin(Serial2);
     display.display();
-    delay(1000);
+    delay(3000);
 
     // Initialise ToF sensors
     tcaselect(0);
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("ToF sensors"));
-    display.setCursor(0, 10);
+    display.display();
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
+        display.printf("initialising %d", t);
+        display.display();
         activeToFSensors[t] = sensor.init();
+        display.setCursor(0, display.getCursorY() + 1);
+        display.printf("init %d done", t);
 
         if (activeToFSensors[t]) {
             display.printf("%d: OK", t);
@@ -186,6 +191,9 @@ void setup() {
         display.display();
         delay(100);
     }
+    delay(2000);
+    display.clearDisplay();
+    display.display();
 
     // //initialise IMU
     display.clearDisplay();
@@ -194,8 +202,15 @@ void setup() {
     // Do we have an IMU
     if (!bno.begin()) {
         display.println("FAIL");
+        display.display();
+        delay(3000);
     } else {
         display.println("OK");
+        display.display();
+        delay(3000);
+
+        display.clearDisplay();
+        display.setCursor(0, 0);
 
         // look for calibration data. if it exists, load it.
         // if not, calibrate then store the data in the EEPROM
@@ -226,10 +241,12 @@ void setup() {
         delay(3000);
 
         display.clearDisplay();
+        display.setCursor(0,0);
         sensors_event_t event;
         bno.getEvent(&event);
         if (foundCalib) {
             display.println("Move sensor slightly to calibrate magnetometers");
+            display.display();
             while (!bno.isFullyCalibrated()) {
                 bno.getEvent(&event);
                 delay(BNO055_SAMPLERATE_DELAY_MS);
@@ -256,10 +273,13 @@ void setup() {
         }
         display.println("calibrated OK");
         display.display();
+        delay(3000);
 
         adafruit_bno055_offsets_t newCalib;
         bno.getSensorOffsets(newCalib);
-
+        display.clearDisplay();
+        display.setCursor(0,0);
+        
         display.println("Storing calibration data to EEPROM...");
 
         eeAddress = 0;
@@ -271,11 +291,13 @@ void setup() {
         eeAddress += sizeof(long);
         EEPROM.put(eeAddress, newCalib);
         display.println("Data stored to EEPROM.");
+        display.display();
 
         delay(2000);
     }
 
     display.clearDisplay();
+    display.setCursor(0,0);
     display.println("Running");
     display.display();
 }
@@ -349,5 +371,6 @@ void loop() {
 
         // Send data
         myTransfer.sendData(payloadSize);
+        Serial.printf("x: %f y: %f z: %f", orientationReading.x, orientationReading.y, orientationReading.z);
     }
 }
