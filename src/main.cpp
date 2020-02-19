@@ -1,4 +1,6 @@
+#include <Adafruit_BNO055.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <unordered_map>
 #include <Chrono.h>
@@ -6,6 +8,7 @@
 #include <SerialTransfer.h>
 #include <Servo.h>
 #include <VL53L0X.h>
+#include <utility/imumaths.h>
 #include "Wire.h"
 #include "graphics.h"
 #include "teensy_config.h"
@@ -49,6 +52,13 @@ long encoderReadings[NUM_ENCODERS];
 long oldEncoderReadings[NUM_ENCODERS];
 
 Adafruit_SSD1306 display(128, 64);
+
+Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
+struct OrientationReading {
+    float x;
+    float y;
+    float z;
+} orientationReading;
 
 void tcaselect(uint8_t i) {
     if (i > 7) {
@@ -264,7 +274,6 @@ void setup() {
     display.setCursor(0, 10);
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
-
         activeToFSensors[t] = sensor.init();
 
         if (activeToFSensors[t]) {
@@ -284,8 +293,41 @@ void setup() {
             display.setCursor(64, display.getCursorY());
         }
         display.display();
-        delay(1000);
+        delay(100);
     }
+
+    // //initialise IMU
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(F("IMU"));
+    if (!bno.begin()) {
+        display.println("FAIL");
+    } else {
+        display.println("OK");
+    }
+    uint8_t system, gyro, accel, mag;
+    system = gyro = accel = mag = 0;
+
+    u_int8_t curYPos = display.getCursorY();
+    while (!system) {
+        bno.getCalibration(&system, &gyro, &accel, &mag);
+        display.setCursor(0, curYPos);
+        /* Display the individual values */
+        display.print("Sys:");
+        display.print(system, DEC);
+        display.print(" G:");
+        display.print(gyro, DEC);
+        display.print(" A:");
+        display.print(accel, DEC);
+        display.print(" M:");
+        display.println(mag, DEC);
+        display.display();
+    };
+    display.println("calibrated OK");
+    display.display();
+    delay(2000);
+    display.clearDisplay();
+    display.display();
 }
 
 void loop() {
@@ -301,7 +343,7 @@ void loop() {
             myTransfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), recSize);
         } else {
             missedMotorMessageCount++;
-        }
+        }   
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
@@ -355,6 +397,15 @@ void loop() {
             encoderReadings[n] = encoders[n].read();
         }
 
+        // Read IMU
+        sensors_event_t orientationData;
+        bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
+
+        orientationReading.x = orientationData.orientation.x;
+        orientationReading.y = orientationData.orientation.y;
+        orientationReading.z = orientationData.orientation.z;
+
+
         uint16_t payloadSize = 0;
 
         // Prepare the distance data
@@ -364,6 +415,10 @@ void loop() {
         //Prepare encoder data
         myTransfer.txObj(encoderReadings, sizeof(encoderReadings), payloadSize);
         payloadSize += sizeof(encoderReadings);
+
+        //Prepare IMU data
+        myTransfer.txObj(orientationReading, sizeof(orientationReading), payloadSize);
+        payloadSize += sizeof(orientationReading);
 
         // Send data
         myTransfer.sendData(payloadSize);
