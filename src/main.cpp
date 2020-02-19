@@ -22,10 +22,17 @@ extern "C" {
 Servo motorLeft;
 Servo motorRight;
 
+
+struct Pose {
+    float heading;
+    float x;
+    float y;
+} currentPosition;
+
 struct Speeds {
     float left;
     float right;
-} commandMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds;
+} commandMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds, groundSpeeds;
 long lastLoopTime = millis();
 
 uint32_t missedMotorMessageCount = 0;
@@ -103,6 +110,29 @@ float batteryVoltage(){
     return voltage;
 }
 
+struct Speeds getActualSpeeds(){
+   // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct 
+
+    float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
+    lastLoopTime = millis();
+    float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
+    //compare old and latest encoder readings to see how much each wheel has rotated
+    //speed is distance/time and should be a float in mm/sec 
+    float motorSpeeds[NUM_ENCODERS];
+    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+        motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
+    }
+    
+    //most representative speed assumed to be slowest wheel
+    //#0 & #1 known to be on one side of bot, #3 & #5 on the other
+    //at the moment, I'm not sure which is is which though...
+    struct Speeds actualMotorSpeeds;
+    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
+    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
+    
+    return actualMotorSpeeds;
+}
+
 struct Speeds feedForward(struct Speeds targetSpeeds){
     // takes two speed commands in mm/sec
     // returns predicted motor power -100 to +100%
@@ -142,7 +172,7 @@ struct Speeds feedForward(struct Speeds targetSpeeds){
     return commandSpeeds;
 }
 
-struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
+struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds, struct Speeds actualSpeeds){
    // apply PID
     // takes two speed commands in -100 to +100 and two
     // target speeds in mm/sec
@@ -154,28 +184,11 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     //. i.e power percentage proporational to difference
     // between desired speed and current actual wheel speed
     float kp = 0.03;  //ie. how much power to use for a given speed error
-    float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
-    lastLoopTime = millis();
-    float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
-
-    //compare old and latest encoder readings to see how much each wheel has rotated
-    //speed is distance/time and should be a float in mm/sec 
-    float motorSpeeds[NUM_ENCODERS];
-    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-        motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
-    }
-    
-    //most representative speed assumed to be slowest wheel
-    //#0 & #1 known to be on one side of bot, #3 & #5 on the other
-    //at the moment, I'm not sure which is is which though...
-    struct Speeds actualMotorSpeeds;
-    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
-    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
 
     // do actual Proportional calc.
     //speed error is target - actual.
-    commandSpeeds.left = kp * (targetSpeeds.left - actualMotorSpeeds.left);
-    commandSpeeds.right = kp * (targetSpeeds.right - actualMotorSpeeds.right);
+    commandSpeeds.left = kp * (targetSpeeds.left - actualSpeeds.left);
+    commandSpeeds.right = kp * (targetSpeeds.right - actualSpeeds.right);
 
     //constrain output
     float max_power=50;
@@ -349,6 +362,9 @@ void setup() {
     delay(2000);
     display.clearDisplay();
     display.display();
+    currentPosition.heading = 0;
+    currentPosition.x = 0;
+    currentPosition.y = 0;
 }
 
 void loop() {
@@ -395,8 +411,10 @@ void loop() {
     //get predicted motor powers from feedforward
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
 
+    groundSpeeds = getActualSpeeds();
+
     //apply PID to motor powers based on deviation from target speed
-    commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
+    commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds, groundSpeeds);
  
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
@@ -445,6 +463,10 @@ void loop() {
         //Prepare IMU data
         myTransfer.txObj(orientationReading, sizeof(orientationReading), payloadSize);
         payloadSize += sizeof(orientationReading);
+
+        //Prepare odometry data
+        myTransfer.txObj(currentPosition, sizeof(currentPosition), payloadSize);
+        payloadSize += sizeof(currentPosition);
 
         // Send data
         myTransfer.sendData(payloadSize);
