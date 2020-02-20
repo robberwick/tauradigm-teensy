@@ -27,7 +27,7 @@ struct Pose {
     float heading;
     float x;
     float y;
-} currentPosition;
+} currentPosition, previousPosition;
 
 struct Speeds {
     float left;
@@ -97,6 +97,13 @@ float minMagnitude(float x, float y, float z) {
     return currentMin;
 }
 
+float wrapTwoPi(float angle) {
+    //wraps an angle to stay within +/-pi
+	while (angle > M_PI) angle -= TWO_PI;
+	while (angle < -M_PI) angle += TWO_PI;
+	return angle;
+}
+
 float batteryVoltage(){
     //reads ADC, interprets it and 
     //returns battery voltage as a float
@@ -110,17 +117,15 @@ float batteryVoltage(){
     return voltage;
 }
 
-struct Speeds getActualSpeeds(){
+float getDistanceTravelled(){
    // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct 
 
-    float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
-    lastLoopTime = millis();
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
     //compare old and latest encoder readings to see how much each wheel has rotated
     //speed is distance/time and should be a float in mm/sec 
     float motorSpeeds[NUM_ENCODERS];
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-        motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
+        motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) * travelPerEncoderCount;
     }
     
     //most representative speed assumed to be slowest wheel
@@ -129,8 +134,17 @@ struct Speeds getActualSpeeds(){
     struct Speeds actualMotorSpeeds;
     actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
     actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
-    
-    return actualMotorSpeeds;
+    float distanceTravelled;
+    distanceTravelled = (actualMotorSpeeds.right+actualMotorSpeeds.left)/2;
+    return distanceTravelled;
+}
+struct Speeds getActualSpeeds(float speed, float turnRate){
+    //takes linear speed and turn rate and converts to actual ground speed at the wheel 
+    struct Speeds ActualSpeeds;
+    float trackWidth = 136;
+    ActualSpeeds.left = speed - 0.5 * trackWidth * turnRate;
+    ActualSpeeds.right = speed + 0.5 * trackWidth * turnRate;
+    return ActualSpeeds;
 }
 
 struct Speeds feedForward(struct Speeds targetSpeeds){
@@ -198,6 +212,12 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds, struc
     return commandSpeeds;
 }
 
+struct Pose odometry(struct Pose startPosition, struct OrientationReading orientation, struct Speeds wheelSpeeds){
+    //takes an initila positon, heading and travel and returns the new position
+    struct Pose location;
+
+    return location;
+}
 void haltAndCatchFire() {
     while (1) {
     }
@@ -244,13 +264,13 @@ void setup() {
         (display.height() - LOGO_HEIGHT) / 2,
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
     display.display();
-    delay(3000);
+    delay(300);
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println("Battery Voltage:");
     display.printf("%2.2f V", batteryVoltage());
     display.display();
-    delay(2000);
+    delay(200);
 
     // Setup serial comms
     // Show debug warning if debug flag is set
@@ -262,7 +282,7 @@ void setup() {
     display.println("Debug flag is set");
     display.println("Waiting for\nUSB serial");
     display.display();
-    delay(1000);
+    delay(100);
     Serial.begin(115200);
     while (!Serial) {
     };
@@ -274,7 +294,7 @@ void setup() {
 
     // do i2c scan
     do_i2c_scan();
-    delay(3000);
+    delay(300);
 
     // Attach motors
     display.clearDisplay();
@@ -288,7 +308,7 @@ void setup() {
     display.setCursor(0, 10);
     display.print("OK");
     display.display();
-    delay(1000);
+    delay(100);
 
     // Initialise serial transfer
     display.clearDisplay();
@@ -327,7 +347,7 @@ void setup() {
             display.setCursor(64, display.getCursorY());
         }
         display.display();
-        delay(100);
+        delay(10);
     }
 
     // //initialise IMU
@@ -359,7 +379,7 @@ void setup() {
     };
     display.println("calibrated OK");
     display.display();
-    delay(2000);
+    delay(200);
     display.clearDisplay();
     display.display();
     currentPosition.heading = 0;
@@ -411,7 +431,20 @@ void loop() {
     //get predicted motor powers from feedforward
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
 
-    groundSpeeds = getActualSpeeds();
+
+    float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
+    lastLoopTime = millis();
+    previousPosition = currentPosition;
+    currentPosition.heading = orientationReading.x;
+
+    float distanceMoved = getDistanceTravelled();
+    float speed = distanceMoved/loopTime;
+
+    //constrain heading change to +/-180 (but in radians)
+    float headingdiff = currentPosition.heading-previousPosition.heading;
+    float headingChange = wrapTwoPi(headingdiff);
+    float rotationRate = headingChange/loopTime;
+    groundSpeeds = getActualSpeeds(speed, rotationRate);
 
     //apply PID to motor powers based on deviation from target speed
     commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds, groundSpeeds);
@@ -419,6 +452,20 @@ void loop() {
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
+
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(currentPosition.heading);
+    display.setCursor(0, 10);
+    headingdiff += M_PI;
+    while (headingdiff < -M_PI) headingdiff += TWO_PI;
+    display.println(previousPosition.heading);
+    display.setCursor(0, 20);
+    headingdiff -= M_PI;
+    display.print(headingdiff);
+    display.setCursor(0, 30);
+    display.print(headingChange);
+    display.display();
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
@@ -445,9 +492,9 @@ void loop() {
         sensors_event_t orientationData;
         bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
 
-        orientationReading.x = orientationData.orientation.x;
-        orientationReading.y = orientationData.orientation.y;
-        orientationReading.z = orientationData.orientation.z;
+        orientationReading.x = radians(orientationData.orientation.x);
+        orientationReading.y = radians(orientationData.orientation.y);
+        orientationReading.z = radians(orientationData.orientation.z);
 
 
         uint16_t payloadSize = 0;
