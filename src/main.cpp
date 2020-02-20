@@ -1,10 +1,14 @@
+#include <Adafruit_BNO055.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_Sensor.h>
 #include <Arduino.h>
+#include <unordered_map>
 #include <Chrono.h>
 #include <Encoder.h>
 #include <SerialTransfer.h>
 #include <Servo.h>
 #include <VL53L0X.h>
+#include <utility/imumaths.h>
 #include "Wire.h"
 #include "graphics.h"
 #include "teensy_config.h"
@@ -25,6 +29,8 @@ struct Speeds {
 long lastLoopTime = millis();
 
 uint32_t missedMotorMessageCount = 0;
+
+float minBatVoltage = 11.1;
 
 SerialTransfer myTransfer;
 
@@ -49,12 +55,19 @@ long oldEncoderReadings[NUM_ENCODERS];
 
 Adafruit_SSD1306 display(128, 64);
 
+Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
+struct OrientationReading {
+    float x;
+    float y;
+    float z;
+} orientationReading;
+
 void tcaselect(uint8_t i) {
     if (i > 7) {
         return;
     }
 
-    Wire.beginTransmission(TCAADDR);
+    Wire.beginTransmission(TCA_ADDR);
     Wire.write(1 << i);
     Wire.endTransmission();
 }
@@ -75,6 +88,19 @@ float minMagnitude(float x, float y, float z) {
         currentMin = z;
     }
     return currentMin;
+}
+
+float batteryVoltage(){
+    //reads ADC, interprets it and 
+    //returns battery voltage as a float
+    float ADC, voltage;
+    //AnalogRead returns 10bit fraction of Vdd
+    ADC = analogRead(TEENSY_PIN_BATT_SENSE)*3.3/1023.0;
+
+     //ADC reads battery via a potential divider of 33k and 10k
+     //but they're wrong/outof spec
+    voltage = ADC * (26.9+10.0)/10.0;
+    return voltage;
 }
 
 struct Speeds feedForward(struct Speeds targetSpeeds){
@@ -171,8 +197,14 @@ void do_i2c_scan() {
     for (uint8_t addr = 1; addr <= 127; addr++) {
         uint8_t data;
         if (!twi_writeTo(addr, &data, 0, 1, 1)) {
-            display.print("0x");
-            display.println(addr, HEX);
+            //C++20 has a contains() method for unordered_map
+            // but find() is only one available to us?    
+            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()){
+                display.println(I2C_ADDRESS_NAMES.at(addr));
+            } else {
+                display.print("0x");
+                display.println(addr, HEX);
+            }
         }
     }
     display.display();
@@ -200,6 +232,12 @@ void setup() {
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
     display.display();
     delay(3000);
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println("Battery Voltage:");
+    display.printf("%2.2f V", batteryVoltage());
+    display.display();
+    delay(2000);
 
     // Setup serial comms
     // Show debug warning if debug flag is set
@@ -223,7 +261,7 @@ void setup() {
 
     // do i2c scan
     do_i2c_scan();
-    delay(2000);
+    delay(3000);
 
     // Attach motors
     display.clearDisplay();
@@ -257,7 +295,6 @@ void setup() {
     display.setCursor(0, 10);
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
-
         activeToFSensors[t] = sensor.init();
 
         if (activeToFSensors[t]) {
@@ -277,8 +314,41 @@ void setup() {
             display.setCursor(64, display.getCursorY());
         }
         display.display();
-        delay(1000);
+        delay(100);
     }
+
+    // //initialise IMU
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(F("IMU"));
+    if (!bno.begin()) {
+        display.println("FAIL");
+    } else {
+        display.println("OK");
+    }
+    uint8_t system, gyro, accel, mag;
+    system = gyro = accel = mag = 0;
+
+    u_int8_t curYPos = display.getCursorY();
+    while (!system) {
+        bno.getCalibration(&system, &gyro, &accel, &mag);
+        display.setCursor(0, curYPos);
+        /* Display the individual values */
+        display.print("Sys:");
+        display.print(system, DEC);
+        display.print(" G:");
+        display.print(gyro, DEC);
+        display.print(" A:");
+        display.print(accel, DEC);
+        display.print(" M:");
+        display.println(mag, DEC);
+        display.display();
+    };
+    display.println("calibrated OK");
+    display.display();
+    delay(2000);
+    display.clearDisplay();
+    display.display();
 }
 
 void loop() {
@@ -294,10 +364,15 @@ void loop() {
             myTransfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), recSize);
         } else {
             missedMotorMessageCount++;
-        }
+        }   
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
+        requestedMotorSpeeds.left = 0;
+        requestedMotorSpeeds.right = 0;
+    }
+    // is battery going flat?
+    if (batteryVoltage() < minBatVoltage) {
         requestedMotorSpeeds.left = 0;
         requestedMotorSpeeds.right = 0;
     }
@@ -348,6 +423,15 @@ void loop() {
             encoderReadings[n] = encoders[n].read();
         }
 
+        // Read IMU
+        sensors_event_t orientationData;
+        bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
+
+        orientationReading.x = orientationData.orientation.x;
+        orientationReading.y = orientationData.orientation.y;
+        orientationReading.z = orientationData.orientation.z;
+
+
         uint16_t payloadSize = 0;
 
         // Prepare the distance data
@@ -357,6 +441,10 @@ void loop() {
         //Prepare encoder data
         myTransfer.txObj(encoderReadings, sizeof(encoderReadings), payloadSize);
         payloadSize += sizeof(encoderReadings);
+
+        //Prepare IMU data
+        myTransfer.txObj(orientationReading, sizeof(orientationReading), payloadSize);
+        payloadSize += sizeof(orientationReading);
 
         // Send data
         myTransfer.sendData(payloadSize);
