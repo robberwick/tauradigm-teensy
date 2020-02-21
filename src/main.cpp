@@ -409,13 +409,28 @@ void setup() {
 
         display.clearDisplay();
         display.setCursor(0,0);
+        uint8_t system, gyro, accel, mag;
+        system = gyro = accel = mag = 0;
         sensors_event_t event;
         bno.getEvent(&event);
         if (foundCalib) {
             display.println("Move sensor slightly to calibrate magnetometers");
             display.display();
+            u_int8_t curYPos = display.getCursorY();
             while (!bno.isFullyCalibrated()) {
                 bno.getEvent(&event);
+                bno.getCalibration(&system, &gyro, &accel, &mag);
+                /* Display the individual values */
+                display.setCursor(0, curYPos);
+                display.print("Sys:");
+                display.print(system, DEC);	
+                display.print(" G:");
+                display.print(gyro, DEC);
+                display.print(" A:");
+                display.print(accel, DEC);	
+                display.print(" M:");
+                display.println(mag, DEC);
+                display.display();
                 delay(BNO055_SAMPLERATE_DELAY_MS);
             }
         } else {
@@ -423,7 +438,6 @@ void setup() {
             u_int8_t curYPos = display.getCursorY();
             while (!bno.isFullyCalibrated()) {
                 bno.getEvent(&event);
-
                 display.setCursor(0, curYPos);
                 /* Display the individual values */
                 display.print("X:");
@@ -431,7 +445,17 @@ void setup() {
                 display.print(" Y:");
                 display.print(event.orientation.y, 4);
                 display.print(" Z:");
-                display.print(event.orientation.z, 4);
+                display.println(event.orientation.z, 4);
+                bno.getCalibration(&system, &gyro, &accel, &mag);
+               /* Display the individual values */
+                display.print("Sys:");
+                display.print(system, DEC);	
+                display.print(" G:");
+                display.print(gyro, DEC);
+                display.print(" A:");
+                display.print(accel, DEC);	
+                display.print(" M:");
+                display.println(mag, DEC);
                 display.display();
 
                 /* Wait the specified delay before requesting new data */
