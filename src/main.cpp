@@ -130,13 +130,13 @@ float getDistanceTravelled(float turnAngle){
         rotation[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) * travelPerEncoderCount;
     }
     float turnCompensation = turnAngle * trackWidth/2;
-
+//    turnCompensation = 0;
     //most representative speed assumed to be slowest wheel
     //#0 & #1 is left, #3 & #5 right
     //works out distance travelled of centre of bot using change in rotation
     struct Speeds perceivedTravelSpeed;
-    perceivedTravelSpeed.right = minMagnitude(rotation[3], rotation[5], rotation[5]) + turnCompensation;
-    perceivedTravelSpeed.left = minMagnitude(rotation[0], rotation[1], rotation[1]) - turnCompensation;
+    perceivedTravelSpeed.right = minMagnitude(rotation[3], rotation[5], rotation[5]) - turnCompensation;
+    perceivedTravelSpeed.left = minMagnitude(rotation[0], rotation[1], rotation[1]) + turnCompensation;
     float distanceTravelled;
     distanceTravelled = minMagnitude(perceivedTravelSpeed.right, perceivedTravelSpeed.left, perceivedTravelSpeed.left);
     return distanceTravelled;
@@ -200,7 +200,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds, struc
     // or at the moment, just proportional
     //. i.e power percentage proporational to difference
     // between desired speed and current actual wheel speed
-    float kp = 0.01;  //ie. how much power to use for a given speed error
+    float kp = 0.1;  //ie. how much power to use for a given speed error
 //was 0.03
     // do actual Proportional calc.
     //speed error is target - actual.
@@ -273,7 +273,7 @@ void setup() {
     display.println("Battery Voltage:");
     display.printf("%2.2f V", batteryVoltage());
     display.display();
-    delay(200);
+    delay(2000);
 
     // Setup serial comms
     // Show debug warning if debug flag is set
@@ -418,7 +418,6 @@ void setup() {
             display.display();
             u_int8_t curYPos = display.getCursorY();
             while (!bno.isFullyCalibrated()) {
-                bno.getEvent(&event);
                 bno.getCalibration(&system, &gyro, &accel, &mag);
                 /* Display the individual values */
                 display.setCursor(0, curYPos);
@@ -430,7 +429,17 @@ void setup() {
                 display.print(accel, DEC);	
                 display.print(" M:");
                 display.println(mag, DEC);
+                display.setCursor(0, curYPos + 10);
+                /* Display the individual values */
+                display.print("X:");
+                display.print(event.orientation.x, 4);
+                display.print(" Y:");
+                display.print(event.orientation.y, 4);
+                display.print(" Z:");
+                display.println(event.orientation.z, 4);
                 display.display();
+                delay(BNO055_SAMPLERATE_DELAY_MS);
+                bno.getEvent(&event);
                 delay(BNO055_SAMPLERATE_DELAY_MS);
             }
         } else {
@@ -572,10 +581,12 @@ void loop() {
     display.println(groundSpeeds.left);
     display.setCursor(0, 10);
     display.println(groundSpeeds.right);
-    display.setCursor(60, 10);
+    display.setCursor(60, 20);
     display.println(commandMotorSpeeds.left);
-    display.setCursor(0, 10);
+    display.setCursor(0, 20);
     display.println(commandMotorSpeeds.right);
+    display.setCursor(20, 30);
+    display.println(speed);
     display.display();
 
     if (readSensors.hasPassed(10)) {
