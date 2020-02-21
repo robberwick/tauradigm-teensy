@@ -39,7 +39,7 @@ long lastLoopTime = millis();
 uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
-
+float trackWidth = 136;
 SerialTransfer myTransfer;
 
 int8_t step = 1;
@@ -118,33 +118,35 @@ float batteryVoltage(){
     return voltage;
 }
 
-float getDistanceTravelled(){
-   // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct 
+float getDistanceTravelled(float turnAngle){
+   // Uses minimum encoder reading and imu turn angle (in radians) to estimate actual travel speed.
+   // returns a float in millimeters 
 
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
-    //compare old and latest encoder readings to see how much each wheel has rotated
-    //speed is distance/time and should be a float in mm/sec 
-    float motorSpeeds[NUM_ENCODERS];
+
+    //compare old and latest encoder readings to see how much each wheel has rotated 
+    float rotation[NUM_ENCODERS];
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-        motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) * travelPerEncoderCount;
+        rotation[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) * travelPerEncoderCount;
     }
-    
+    float turnCompensation = turnAngle * trackWidth/2;
+
     //most representative speed assumed to be slowest wheel
-    //#0 & #1 known to be on one side of bot, #3 & #5 on the other
-    //at the moment, I'm not sure which is is which though...
-    struct Speeds actualMotorSpeeds;
-    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
-    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
+    //#0 & #1 is left, #3 & #5 right
+    //works out distance travelled of centre of bot using change in rotation
+    struct Speeds perceivedTravelSpeed;
+    perceivedTravelSpeed.right = minMagnitude(rotation[3], rotation[5], rotation[5]) + turnCompensation;
+    perceivedTravelSpeed.left = minMagnitude(rotation[0], rotation[1], rotation[1]) - turnCompensation;
     float distanceTravelled;
-    distanceTravelled = (actualMotorSpeeds.right+actualMotorSpeeds.left)/2;
+    distanceTravelled = minMagnitude(perceivedTravelSpeed.right, perceivedTravelSpeed.left, perceivedTravelSpeed.left);
     return distanceTravelled;
 }
+
 struct Speeds getActualSpeeds(float speed, float turnRate){
     //takes linear speed and turn rate and converts to actual ground speed at the wheel 
     struct Speeds ActualSpeeds;
-    float trackWidth = 136;
-    ActualSpeeds.left = speed - 0.5 * trackWidth * turnRate;
-    ActualSpeeds.right = speed + 0.5 * trackWidth * turnRate;
+    ActualSpeeds.left = speed + 0.5 * trackWidth * turnRate;
+    ActualSpeeds.right = speed - 0.5 * trackWidth * turnRate;
     return ActualSpeeds;
 }
 
@@ -198,8 +200,8 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds, struc
     // or at the moment, just proportional
     //. i.e power percentage proporational to difference
     // between desired speed and current actual wheel speed
-    float kp = 0.03;  //ie. how much power to use for a given speed error
-
+    float kp = 0.01;  //ie. how much power to use for a given speed error
+//was 0.03
     // do actual Proportional calc.
     //speed error is target - actual.
     commandSpeeds.left = kp * (targetSpeeds.left - actualSpeeds.left);
@@ -520,13 +522,14 @@ void loop() {
     previousPosition = currentPosition;
     currentPosition.heading = orientationReading.x;
 
-    float distanceMoved = getDistanceTravelled();
-    float speed = distanceMoved/loopTime;
-
     //constrain heading change to +/-180 (but in radians)
     float headingdiff = currentPosition.heading-previousPosition.heading;
     float headingChange = wrapTwoPi(headingdiff);
     float rotationRate = headingChange/loopTime;
+
+    float distanceMoved = getDistanceTravelled(rotationRate);
+    float speed = distanceMoved/loopTime;
+
     groundSpeeds = getActualSpeeds(speed, rotationRate);
 
     //apply PID to motor powers based on deviation from target speed
@@ -537,17 +540,18 @@ void loop() {
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 
     display.clearDisplay();
+    display.setCursor(60, 0);
+    display.println(targetMotorSpeeds.left);
     display.setCursor(0, 0);
-    display.println(currentPosition.heading);
+    display.println(targetMotorSpeeds.right);
+    display.setCursor(60, 10);
+    display.println(groundSpeeds.left);
     display.setCursor(0, 10);
-    headingdiff += M_PI;
-    while (headingdiff < -M_PI) headingdiff += TWO_PI;
-    display.println(previousPosition.heading);
-    display.setCursor(0, 20);
-    headingdiff -= M_PI;
-    display.print(headingdiff);
-    display.setCursor(0, 30);
-    display.print(headingChange);
+    display.println(groundSpeeds.right);
+    display.setCursor(60, 10);
+    display.println(commandMotorSpeeds.left);
+    display.setCursor(0, 10);
+    display.println(commandMotorSpeeds.right);
     display.display();
 
     if (readSensors.hasPassed(10)) {
