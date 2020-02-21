@@ -40,6 +40,7 @@ uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
 float trackWidth = 136;
+float smoothedTurnRate = 0;
 SerialTransfer myTransfer;
 
 int8_t step = 1;
@@ -130,12 +131,12 @@ float getDistanceTravelled(float turnAngle){
         rotation[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) * travelPerEncoderCount;
     }
     float turnCompensation = turnAngle * trackWidth/2;
-//    turnCompensation = 0;
+
     //most representative speed assumed to be slowest wheel
     //#0 & #1 is left, #3 & #5 right
     //works out distance travelled of centre of bot using change in rotation
     struct Speeds perceivedTravelSpeed;
-    perceivedTravelSpeed.right = minMagnitude(rotation[3], rotation[5], rotation[5]) - turnCompensation;
+    perceivedTravelSpeed.right = -minMagnitude(rotation[3], rotation[5], rotation[5]) - turnCompensation;
     perceivedTravelSpeed.left = minMagnitude(rotation[0], rotation[1], rotation[1]) + turnCompensation;
     float distanceTravelled;
     distanceTravelled = minMagnitude(perceivedTravelSpeed.right, perceivedTravelSpeed.left, perceivedTravelSpeed.left);
@@ -200,8 +201,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds, struc
     // or at the moment, just proportional
     //. i.e power percentage proporational to difference
     // between desired speed and current actual wheel speed
-    float kp = 0.1;  //ie. how much power to use for a given speed error
-//was 0.03
+    float kp = 0.03;  //ie. how much power to use for a given speed error
     // do actual Proportional calc.
     //speed error is target - actual.
     commandSpeeds.left = kp * (targetSpeeds.left - actualSpeeds.left);
@@ -559,11 +559,11 @@ void loop() {
     float headingdiff = currentPosition.heading-previousPosition.heading;
     float headingChange = wrapTwoPi(headingdiff);
     float rotationRate = headingChange/loopTime;
-
-    float distanceMoved = getDistanceTravelled(rotationRate);
+    smoothedTurnRate = smoothedTurnRate * 0.9 + 0.1* rotationRate;
+    float distanceMoved = getDistanceTravelled(smoothedTurnRate);
     float speed = distanceMoved/loopTime;
 
-    groundSpeeds = getActualSpeeds(speed, rotationRate);
+    groundSpeeds = getActualSpeeds(speed, smoothedTurnRate);
 
     //apply PID to motor powers based on deviation from target speed
     commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds, groundSpeeds);
