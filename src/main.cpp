@@ -23,12 +23,18 @@ extern "C" {
 Servo motorLeft;
 Servo motorRight;
 
+struct Pose {
+    float heading;
+    float x;
+    float y;
+} currentPosition, previousPosition;
+
 struct Speeds {
     float left;
     float right;
-} commandMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds;
+} commandMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds, actualMotorSpeeds;
 long lastLoopTime = millis();
-
+float loopTime = 0;
 uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
@@ -89,6 +95,15 @@ float minMagnitude(float x, float y, float z) {
         currentMin = z;
     }
     return currentMin;
+}
+
+struct Pose updatePose(struct Pose oldPosition, float heading, float distanceTravelled){
+    // takes current position, new heading and distance traveled to work out a new position
+    struct Pose newPosition;
+    newPosition.heading = heading;
+    newPosition.x = oldPosition.x + distanceTravelled * cos(heading);
+    newPosition.y = oldPosition.y + distanceTravelled * sin(heading);
+    return newPosition;
 }
 
 float batteryVoltage(){
@@ -155,7 +170,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     //. i.e power percentage proporational to difference
     // between desired speed and current actual wheel speed
     float kp = 0.03;  //ie. how much power to use for a given speed error
-    float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
+    loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
 
@@ -169,7 +184,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     //most representative speed assumed to be slowest wheel
     //#0 & #1 known to be on one side of bot, #3 & #5 on the other
     //at the moment, I'm not sure which is is which though...
-    struct Speeds actualMotorSpeeds;
+
     actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
     actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
 
@@ -432,6 +447,7 @@ void setup() {
     display.setCursor(0,0);
     display.println("Running");
     display.display();
+    currentPosition.heading = currentPosition.x = currentPosition.y = 0;
 }
 
 void loop() {
@@ -467,8 +483,6 @@ void loop() {
     float maxspeed_mm_per_sec = 3000;  //max acheivable is 8000
     targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
-
-
 
     //convert speed commands into predicted power
     // otherwise known as feedforward. We can do feedforward
@@ -510,12 +524,17 @@ void loop() {
         sensors_event_t orientationData;
         bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
 
-        orientationReading.x = orientationData.orientation.x;
-        orientationReading.y = orientationData.orientation.y;
-        orientationReading.z = orientationData.orientation.z;
+        orientationReading.x = radians(orientationData.orientation.x);
+        orientationReading.y = radians(orientationData.orientation.y);
+        orientationReading.z = radians(orientationData.orientation.z);
 
         uint16_t payloadSize = 0;
-
+        
+        //update odometry
+        previousPosition = currentPosition;
+        float distanceMoved = (actualMotorSpeeds.left+actualMotorSpeeds.right)/2 * loopTime;
+        currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
+        
         // Prepare the distance data
         myTransfer.txObj(distances, sizeof(distances), payloadSize);
         payloadSize += sizeof(distances);
@@ -527,6 +546,10 @@ void loop() {
         //Prepare IMU data
         myTransfer.txObj(orientationReading, sizeof(orientationReading), payloadSize);
         payloadSize += sizeof(orientationReading);
+        
+        //Prepare odometry data
+        myTransfer.txObj(currentPosition, sizeof(currentPosition), payloadSize);
+        payloadSize += sizeof(currentPosition);
 
         // Send data
         myTransfer.sendData(payloadSize);
