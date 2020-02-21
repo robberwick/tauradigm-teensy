@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <unordered_map>
 #include <Chrono.h>
+#include <EEPROM.h>
 #include <Encoder.h>
 #include <SerialTransfer.h>
 #include <Servo.h>
@@ -300,6 +301,7 @@ void setup() {
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("Motors"));
+    display.display();
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
     // Initialise motor speeds
@@ -314,21 +316,26 @@ void setup() {
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("Serial transfer"));
-    display.setCursor(0, 10);
+
+    display.display();
     display.print("OK");
     myTransfer.begin(Serial2);
     display.display();
-    delay(1000);
+    delay(300);
 
     // Initialise ToF sensors
     tcaselect(0);
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("ToF sensors"));
-    display.setCursor(0, 10);
+    display.display();
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
+        display.printf("initialising %d", t);
+        display.display();
         activeToFSensors[t] = sensor.init();
+        display.setCursor(0, display.getCursorY() + 1);
+        display.printf("init %d done", t);
 
         if (activeToFSensors[t]) {
             display.printf("%d: OK", t);
@@ -349,38 +356,114 @@ void setup() {
         display.display();
         delay(10);
     }
+    delay(200);
+    display.clearDisplay();
+    display.display();
 
     // //initialise IMU
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("IMU"));
+    // Do we have an IMU
     if (!bno.begin()) {
         display.println("FAIL");
+        display.display();
+        delay(3000);
     } else {
         display.println("OK");
-    }
-    uint8_t system, gyro, accel, mag;
-    system = gyro = accel = mag = 0;
-
-    u_int8_t curYPos = display.getCursorY();
-    while (!system) {
-        bno.getCalibration(&system, &gyro, &accel, &mag);
-        display.setCursor(0, curYPos);
-        /* Display the individual values */
-        display.print("Sys:");
-        display.print(system, DEC);
-        display.print(" G:");
-        display.print(gyro, DEC);
-        display.print(" A:");
-        display.print(accel, DEC);
-        display.print(" M:");
-        display.println(mag, DEC);
         display.display();
-    };
-    display.println("calibrated OK");
-    display.display();
-    delay(200);
+        delay(300);
+
+        display.clearDisplay();
+        display.setCursor(0, 0);
+
+        // look for calibration data. if it exists, load it.
+        // if not, calibrate then store the data in the EEPROM
+        int eeAddress = 0;
+        long bnoID;
+        bool foundCalib = false;
+        EEPROM.get(eeAddress, bnoID);
+
+        adafruit_bno055_offsets_t calibrationData;
+        sensor_t sensor;
+
+        bno.getSensor(&sensor);
+        if (bnoID != sensor.sensor_id) {
+            display.println("No Calibration Data in EEPROM");
+
+        } else {
+            display.println("Found Calibration in EEPROM.");
+            eeAddress += sizeof(long);
+            EEPROM.get(eeAddress, calibrationData);
+
+            display.println("Restoring...");
+            bno.setSensorOffsets(calibrationData);
+
+            display.println("Restored");
+            foundCalib = true;
+        }
+        display.display();
+        delay(300);
+
+        display.clearDisplay();
+        display.setCursor(0,0);
+        sensors_event_t event;
+        bno.getEvent(&event);
+        if (foundCalib) {
+            display.println("Move sensor slightly to calibrate magnetometers");
+            display.display();
+            while (!bno.isFullyCalibrated()) {
+                bno.getEvent(&event);
+                delay(BNO055_SAMPLERATE_DELAY_MS);
+            }
+        } else {
+            display.println("Please Calibrate Sensor: ");
+            u_int8_t curYPos = display.getCursorY();
+            while (!bno.isFullyCalibrated()) {
+                bno.getEvent(&event);
+
+                display.setCursor(0, curYPos);
+                /* Display the individual values */
+                display.print("X:");
+                display.print(event.orientation.x, 4);
+                display.print(" Y:");
+                display.print(event.orientation.y, 4);
+                display.print(" Z:");
+                display.print(event.orientation.z, 4);
+                display.display();
+
+                /* Wait the specified delay before requesting new data */
+                delay(BNO055_SAMPLERATE_DELAY_MS);
+            }
+        }
+        display.println("calibrated OK");
+        display.display();
+        delay(300);
+
+        adafruit_bno055_offsets_t newCalib;
+        bno.getSensorOffsets(newCalib);
+        display.clearDisplay();
+        display.setCursor(0,0);
+        
+        display.println("Storing calibration data to EEPROM...");
+
+        eeAddress = 0;
+        bno.getSensor(&sensor);
+        bnoID = sensor.sensor_id;
+
+        EEPROM.put(eeAddress, bnoID);
+
+        eeAddress += sizeof(long);
+        EEPROM.put(eeAddress, newCalib);
+        display.println("Data stored to EEPROM.");
+        display.display();
+
+        delay(200);
+    }
+
     display.clearDisplay();
+    display.setCursor(0,0);
+    display.println("Running");
     display.display();
     currentPosition.heading = 0;
     currentPosition.x = 0;
@@ -400,7 +483,7 @@ void loop() {
             myTransfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), recSize);
         } else {
             missedMotorMessageCount++;
-        }   
+        }
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
@@ -496,7 +579,6 @@ void loop() {
         orientationReading.y = radians(orientationData.orientation.y);
         orientationReading.z = radians(orientationData.orientation.z);
 
-
         uint16_t payloadSize = 0;
 
         // Prepare the distance data
@@ -517,5 +599,6 @@ void loop() {
 
         // Send data
         myTransfer.sendData(payloadSize);
+        Serial.printf("x: %f y: %f z: %f", orientationReading.x, orientationReading.y, orientationReading.z);
     }
 }
