@@ -34,7 +34,9 @@ struct Speeds {
     float right;
 } commandMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds, actualMotorSpeeds;
 long lastLoopTime = millis();
+long lastDriveLoopTime = millis();
 float loopTime = 0;
+float driveLoopTime = 0;
 uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
@@ -182,8 +184,10 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     }
     
     //most representative speed assumed to be slowest wheel
-    //#0 & #1 known to be on one side of bot, #3 & #5 on the other
-    //at the moment, I'm not sure which is is which though...
+    //#0, #1 & #3 is left,  #3, #4 & #5 is right
+    //#0 is front left     #3 is front right
+    //#1 is rear left      #4 is middle right
+    //#2 is middle left    #5 is rear right
 
     actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
     actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
@@ -363,7 +367,6 @@ void setup() {
         // if not, calibrate then store the data in the EEPROM
         int eeAddress = 0;
         long bnoID;
-        bool foundCalib = false;
         EEPROM.get(eeAddress, bnoID);
 
         adafruit_bno055_offsets_t calibrationData;
@@ -382,41 +385,46 @@ void setup() {
             bno.setSensorOffsets(calibrationData);
 
             display.println("Restored");
-            foundCalib = true;
         }
         display.display();
-        delay(3000);
+        delay(1000);
 
         display.clearDisplay();
         display.setCursor(0,0);
+        display.println("Move robot now to cehck calibration");
+        display.display();
+        delay(5000);
+        uint8_t system, gyro, accel, mag;
+        system = gyro = accel = mag = 0;
         sensors_event_t event;
         bno.getEvent(&event);
-        if (foundCalib) {
-            display.println("Move sensor slightly to calibrate magnetometers");
+        display.println("Move sensor to calibrate magnetometers");
+        display.display();
+        u_int8_t curYPos = display.getCursorY();
+        while (!system) {
+            bno.getCalibration(&system, &gyro, &accel, &mag);
+            /* Display the individual values */
+            display.setCursor(0, curYPos);
+            display.print("Sys:");
+            display.print(system, DEC);	
+            display.print(" G:");
+            display.print(gyro, DEC);
+            display.print(" A:");
+            display.print(accel, DEC);	
+            display.print(" M:");
+            display.println(mag, DEC);
+            display.setCursor(0, curYPos + 10);
+            /* Display the individual values */
+            delay(BNO055_SAMPLERATE_DELAY_MS);
+            display.print("X:");
+            display.print(event.orientation.x, 4);
+            display.print(" Y:");
+            display.print(event.orientation.y, 4);
+            display.print(" Z:");
+            display.println(event.orientation.z, 4);
             display.display();
-            while (!bno.isFullyCalibrated()) {
-                bno.getEvent(&event);
-                delay(BNO055_SAMPLERATE_DELAY_MS);
-            }
-        } else {
-            display.println("Please Calibrate Sensor: ");
-            u_int8_t curYPos = display.getCursorY();
-            while (!bno.isFullyCalibrated()) {
-                bno.getEvent(&event);
-
-                display.setCursor(0, curYPos);
-                /* Display the individual values */
-                display.print("X:");
-                display.print(event.orientation.x, 4);
-                display.print(" Y:");
-                display.print(event.orientation.y, 4);
-                display.print(" Z:");
-                display.print(event.orientation.z, 4);
-                display.display();
-
-                /* Wait the specified delay before requesting new data */
-                delay(BNO055_SAMPLERATE_DELAY_MS);
-            }
+            bno.getEvent(&event);
+            delay(BNO055_SAMPLERATE_DELAY_MS);
         }
         display.println("calibrated OK");
         display.display();
@@ -528,11 +536,26 @@ void loop() {
         orientationReading.y = radians(orientationData.orientation.y);
         orientationReading.z = radians(orientationData.orientation.z);
 
+        display.setCursor(0, 0);
+        /* Display the individual values */
+        display.print("X:");
+        display.print(orientationData.orientation.x, 1);
+        display.setCursor(0, 10);
+        display.print(" Y:");
+        display.print(orientationData.orientation.y, 1);
+        display.setCursor(0, 20);
+        display.print(" Z:");
+        display.print(orientationData.orientation.z, 1);
+        display.display();
+
         uint16_t payloadSize = 0;
         
         //update odometry
+        driveLoopTime = (millis() - lastDriveLoopTime)/1000.0;  // divide by 1000 converts to seconds.
+        lastDriveLoopTime = millis();
+
         previousPosition = currentPosition;
-        float distanceMoved = (actualMotorSpeeds.left+actualMotorSpeeds.right)/2 * loopTime;
+        float distanceMoved = (actualMotorSpeeds.left+actualMotorSpeeds.right)/2 * driveLoopTime;
         currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
         
         // Prepare the distance data
