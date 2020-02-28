@@ -26,7 +26,7 @@ using namespace std;
 #define TEENSY_PIN_HEADLIGHT_PWM (21)
 #define TEENSY_PIN_DRIVE_LEFT (22)
 #define TEENSY_PIN_DRIVE_RIGHT (23)
-#define TEENSY_PIN_BUTTON (33)
+#define TEENSY_PIN_BUTTON (A14)
 
 // i2c Addresses
 #define TCA_ADDR 0x70
