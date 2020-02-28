@@ -34,9 +34,7 @@ struct Speeds {
     float right;
 } commandMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds, actualMotorSpeeds;
 long lastLoopTime = millis();
-long lastDriveLoopTime = millis();
 float loopTime = 0;
-float driveLoopTime = 0;
 uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
@@ -121,6 +119,20 @@ float batteryVoltage(){
     return voltage;
 }
 
+float getDistanceTravelled(){
+   // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct 
+    float travelPerEncoderCount = 1.0;           //millimeters per encoder count. from testing
+    //compare old and latest encoder readings to see how much each wheel has rotated
+    //speed is distance/time and should be a float in mm/sec 
+    float wheelTravel[NUM_ENCODERS];
+    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+        wheelTravel[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) * travelPerEncoderCount;
+    }
+    float rightTravel = minMagnitude(wheelTravel[3], wheelTravel[5], wheelTravel[5]);
+    float leftTravel = minMagnitude(wheelTravel[0], wheelTravel[1], wheelTravel[1]);
+    return (leftTravel-rightTravel)/2;
+}
+
 struct Speeds feedForward(struct Speeds targetSpeeds){
     // takes two speed commands in mm/sec
     // returns predicted motor power -100 to +100%
@@ -198,7 +210,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     commandSpeeds.right = kp * (targetSpeeds.right - actualMotorSpeeds.right);
 
     //constrain output
-    float max_power=50;
+    float max_power=65;
     commandSpeeds.left =max(min(commandSpeeds.left, max_power), -max_power);
     commandSpeeds.right =-max(min(commandSpeeds.right, max_power), -max_power);
 
@@ -251,7 +263,7 @@ void setup() {
         (display.height() - LOGO_HEIGHT) / 2,
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
     display.display();
-    delay(3000);
+    delay(1000);
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println("Battery Voltage:");
@@ -269,7 +281,7 @@ void setup() {
     display.println("Debug flag is set");
     display.println("Waiting for\nUSB serial");
     display.display();
-    delay(1000);
+    delay(100);
     Serial.begin(115200);
     while (!Serial) {
     };
@@ -281,7 +293,7 @@ void setup() {
 
     // do i2c scan
     do_i2c_scan();
-    delay(3000);
+    delay(100);
 
     // Attach motors
     display.clearDisplay();
@@ -296,7 +308,7 @@ void setup() {
     display.setCursor(0, 10);
     display.print("OK");
     display.display();
-    delay(3000);
+    delay(500);
 
     // Initialise serial transfer
     display.clearDisplay();
@@ -307,7 +319,7 @@ void setup() {
     display.print("OK");
     myTransfer.begin(Serial2);
     display.display();
-    delay(3000);
+    delay(500);
 
     // Initialise ToF sensors
     tcaselect(0);
@@ -340,9 +352,9 @@ void setup() {
             display.setCursor(64, display.getCursorY());
         }
         display.display();
-        delay(100);
+        delay(50);
     }
-    delay(2000);
+    delay(500);
     display.clearDisplay();
     display.display();
 
@@ -551,11 +563,8 @@ void loop() {
         uint16_t payloadSize = 0;
         
         //update odometry
-        driveLoopTime = (millis() - lastDriveLoopTime)/1000.0;  // divide by 1000 converts to seconds.
-        lastDriveLoopTime = millis();
-
         previousPosition = currentPosition;
-        float distanceMoved = (actualMotorSpeeds.left+actualMotorSpeeds.right)/2 * driveLoopTime;
+        float distanceMoved = getDistanceTravelled();
         currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
         
         // Prepare the distance data
