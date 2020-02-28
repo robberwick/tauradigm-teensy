@@ -190,79 +190,8 @@ void haltAndCatchFire() {
     }
 }
 
-void do_i2c_scan() {
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("I2c Devices");
-    for (uint8_t addr = 1; addr <= 127; addr++) {
-        uint8_t data;
-        if (!twi_writeTo(addr, &data, 0, 1, 1)) {
-            //C++20 has a contains() method for unordered_map
-            // but find() is only one available to us?    
-            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()){
-                display.println(I2C_ADDRESS_NAMES.at(addr));
-            } else {
-                display.print("0x");
-                display.println(addr, HEX);
-            }
-        }
-    }
-    display.display();
-}
-
-void setup() {
-    // Initialise I2C bus
-    Wire.begin();
-
-    // Initalise display and show logo
-    if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
-        // TODO show failure message on OLED
-        haltAndCatchFire();
-    }
-    display.setTextSize(1);                              // Normal 1:1 pixel scale
-    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
-    display.setCursor(0, 0);                             // Start at top-left corner
-    display.cp437(true);                                 // Use full 256 char 'Code Page 437' font
-
-    display.clearDisplay();
-
-    display.drawBitmap(
-        (display.width() - LOGO_WIDTH) / 2,
-        (display.height() - LOGO_HEIGHT) / 2,
-        logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-    display.display();
-    delay(3000);
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("Battery Voltage:");
-    display.printf("%2.2f V", batteryVoltage());
-    display.display();
-    delay(2000);
-
-    // Setup serial comms
-    // Show debug warning if debug flag is set
-#ifdef DEBUG
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("*** WARNING ***"));
-    display.println("");
-    display.println("Debug flag is set");
-    display.println("Waiting for\nUSB serial");
-    display.display();
-    delay(1000);
-    Serial.begin(115200);
-    while (!Serial) {
-    };
-#endif
-
-    Serial2.begin(115200);
-    while (!Serial2) {
-    };
-
-    // do i2c scan
-    do_i2c_scan();
-    delay(3000);
-
+void post(){
+    
     // Attach motors
     display.clearDisplay();
     display.setCursor(0, 0);
@@ -349,6 +278,151 @@ void setup() {
     delay(2000);
     display.clearDisplay();
     display.display();
+}
+
+void do_i2c_scan() {
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println("I2c Devices");
+    for (uint8_t addr = 1; addr <= 127; addr++) {
+        uint8_t data;
+        if (!twi_writeTo(addr, &data, 0, 1, 1)) {
+            //C++20 has a contains() method for unordered_map
+            // but find() is only one available to us?    
+            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()){
+                display.println(I2C_ADDRESS_NAMES.at(addr));
+            } else {
+                display.print("0x");
+                display.println(addr, HEX);
+            }
+        }
+    }
+    display.display();
+}
+
+void setup() {
+    // Initialise I2C bus
+    Wire.begin();
+
+    // Initalise display and show logo
+    if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
+        // TODO show failure message on OLED
+        haltAndCatchFire();
+    }
+    display.setTextSize(1);                              // Normal 1:1 pixel scale
+    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
+    display.setCursor(0, 0);                             // Start at top-left corner
+    display.cp437(true);                                 // Use full 256 char 'Code Page 437' font
+
+    display.clearDisplay();
+
+    display.drawBitmap(
+        (display.width() - LOGO_WIDTH) / 2,
+        (display.height() - LOGO_HEIGHT) / 2,
+        logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+    display.display();
+    delay(3000);
+    
+    pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
+    display.clearDisplay();
+    display.setCursor(0, 10);
+    display.println("Press button now to  enter POST");
+    display.println();
+    display.println("Battery Voltage:");
+    display.printf("%2.2f V", batteryVoltage());
+    display.display();
+    delay(2000);
+    int buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
+    bool enterPost = false;
+    if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold){
+        enterPost = true;
+        display.println("Entering POST...");
+        display.display();
+    }
+
+    // Setup serial comms
+    // Show debug warning if debug flag is set
+#ifdef DEBUG
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(F("*** WARNING ***"));
+    display.println("");
+    display.println("Debug flag is set");
+    display.println("Waiting for\nUSB serial");
+    display.display();
+    delay(1000);
+    Serial.begin(115200);
+    while (!Serial) {
+    };
+#endif
+
+    Serial2.begin(115200);
+    while (!Serial2) {
+    };
+
+    // do i2c scan
+    do_i2c_scan();
+
+    if (enterPost) {
+        post();
+    } else {
+        // Attach motors
+        motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
+        motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
+        // Initialise motor speeds
+        requestedMotorSpeeds.left = 0;
+        requestedMotorSpeeds.right = 0;
+
+        // Initialise serial transfer
+        myTransfer.begin(Serial2);
+
+        // Initialise ToF sensors
+        tcaselect(0);
+        for (uint8_t t = 0; t < 8; t++) {
+            tcaselect(t);
+            activeToFSensors[t] = sensor.init();
+            if (activeToFSensors[t]) {
+                sensor.setMeasurementTimingBudget(20000);
+                // Start continuous back-to-back mode (take readings as
+                // fast as possible).  To use continuous timed mode
+                // instead, provide a desired inter-measurement period in
+                // ms (e.g. sensor.startContinuous(100)).
+                sensor.startContinuous();
+            }
+        }
+
+        // //initialise IMU
+        display.clearDisplay();
+        display.setCursor(0, 0);
+        if (!bno.begin()) {
+            display.println("IMU FAIL");
+        } else {
+            display.println("IMU CAL:");
+        }
+        uint8_t system, gyro, accel, mag;
+        system = gyro = accel = mag = 0;
+
+        u_int8_t curYPos = display.getCursorY();
+        while (!system) {
+            bno.getCalibration(&system, &gyro, &accel, &mag);
+            display.setCursor(0, curYPos);
+            /* Display the individual values */
+            display.print("Sys:");
+            display.print(system, DEC);
+            display.print(" G:");
+            display.print(gyro, DEC);
+            display.print(" A:");
+            display.print(accel, DEC);
+            display.print(" M:");
+            display.println(mag, DEC);
+            display.display();
+        };
+        display.println("calibrated OK");
+        display.display();
+        delay(200);
+        display.clearDisplay();
+        display.display();
+    }
 }
 
 void loop() {
