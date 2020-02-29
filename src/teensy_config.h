@@ -33,12 +33,14 @@ using namespace std;
 #define DISPLAY_ADDR 0x3c
 #define IMU_ADDR 0x28
 #define TOF_ADDR 0x29
+#define ADC_ADDR 0x48
 typedef const std::unordered_map<uint8_t, String> HexIntMap;
 HexIntMap I2C_ADDRESS_NAMES = {
    {TCA_ADDR, "Multiplexer"},
    {IMU_ADDR, "IMU"},
    {TOF_ADDR, "Distance sensor"},
-   {DISPLAY_ADDR, "OLED display"}
+   {DISPLAY_ADDR, "OLED display"},
+   {ADC_ADDR, "Minesweeper ADC"}
 };
 // hardware counts
 #define NUM_ENCODERS 6
