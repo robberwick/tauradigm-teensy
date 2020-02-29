@@ -295,7 +295,12 @@ void post(){
 
         if (activeToFSensors[t]) {
             display.printf("%d: OK", t);
-            sensor.setMeasurementTimingBudget(20000);
+            sensor.setMeasurementTimingBudget(33000);
+            // lower the return signal rate limit (default is 0.25 MCPS)
+            sensor.setSignalRateLimit(0.1);
+            // increase laser pulse periods (defaults are 14 and 10 PCLKs)
+            sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+            sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
             // Start continuous back-to-back mode (take readings as
             // fast as possible).  To use continuous timed mode
             // instead, provide a desired inter-measurement period in
@@ -524,7 +529,12 @@ void setup() {
             tcaselect(t);
             activeToFSensors[t] = sensor.init();
             if (activeToFSensors[t]) {
-                sensor.setMeasurementTimingBudget(20000);
+                sensor.setMeasurementTimingBudget(33000);
+                // lower the return signal rate limit (default is 0.25 MCPS)
+                sensor.setSignalRateLimit(0.1);
+                // increase laser pulse periods (defaults are 14 and 10 PCLKs)
+                sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+                sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
                 // Start continuous back-to-back mode (take readings as
                 // fast as possible).  To use continuous timed mode
                 // instead, provide a desired inter-measurement period in
