@@ -1,6 +1,7 @@
 #include <Adafruit_BNO055.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_Sensor.h>
+#include <Adafruit_ADS1015.h>
 #include <Arduino.h>
 #include <unordered_map>
 #include <Chrono.h>
@@ -54,6 +55,8 @@ long encoderReadings[NUM_ENCODERS];
 long oldEncoderReadings[NUM_ENCODERS];
 
 Adafruit_SSD1306 display(128, 64);
+ 
+Adafruit_ADS1115 ads1115(ADC_ADDR);	// minesweeper ADC
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
 struct OrientationReading {
@@ -190,11 +193,32 @@ void haltAndCatchFire() {
     }
 }
 
+void do_i2c_scan() {
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println("I2c Devices");
+    for (uint8_t addr = 1; addr <= 127; addr++) {
+        uint8_t data;
+        if (!twi_writeTo(addr, &data, 0, 1, 1)) {
+            //C++20 has a contains() method for unordered_map
+            // but find() is only one available to us?    
+            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()){
+                display.println(I2C_ADDRESS_NAMES.at(addr));
+            } else {
+                display.print("0x");
+                display.println(addr, HEX);
+            }
+        }
+    }
+    display.display();
+    delay(4000);
+}
+
 void post(){
     
     // do i2c scan
     do_i2c_scan();
-    
+
     // Attach motors
     display.clearDisplay();
     display.setCursor(0, 0);
@@ -281,27 +305,6 @@ void post(){
     delay(2000);
     display.clearDisplay();
     display.display();
-}
-
-void do_i2c_scan() {
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("I2c Devices");
-    for (uint8_t addr = 1; addr <= 127; addr++) {
-        uint8_t data;
-        if (!twi_writeTo(addr, &data, 0, 1, 1)) {
-            //C++20 has a contains() method for unordered_map
-            // but find() is only one available to us?    
-            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()){
-                display.println(I2C_ADDRESS_NAMES.at(addr));
-            } else {
-                display.print("0x");
-                display.println(addr, HEX);
-            }
-        }
-    }
-    display.display();
-    delay(4000);
 }
 
 void setup() {
@@ -391,6 +394,8 @@ void setup() {
                 sensor.startContinuous();
             }
         }
+        //initialise ADC
+        ads1115.begin();
 
         // //initialise IMU
         display.clearDisplay();
@@ -423,6 +428,21 @@ void setup() {
         delay(200);
         display.clearDisplay();
         display.display();
+        while (true){
+            display.clearDisplay();
+            display.setCursor(0, 0);
+            int16_t adc0, adc1, adc2, adc3;
+            adc0 = ads1115.readADC_SingleEnded(0);
+            adc1 = ads1115.readADC_SingleEnded(1);
+            adc2 = ads1115.readADC_SingleEnded(2);
+            adc3 = ads1115.readADC_SingleEnded(3);
+            display.printf("1: %d      2: %d", adc0, adc1);
+            display.println();
+            display.printf("3: %d      4: %d", adc2, adc3);
+            display.display();
+            delay(100);
+            //[3] = 4 = back right
+        }
     }
 }
 
