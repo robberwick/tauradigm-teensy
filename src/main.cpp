@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <unordered_map>
 #include <Chrono.h>
+#include <EEPROM.h>
 #include <Encoder.h>
 #include <SerialTransfer.h>
 #include <Servo.h>
@@ -23,12 +24,18 @@ extern "C" {
 Servo motorLeft;
 Servo motorRight;
 
+struct Pose {
+    float heading;
+    float x;
+    float y;
+} currentPosition, previousPosition;
+
 struct Speeds {
     float left;
     float right;
-} commandMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds;
+} commandMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds, actualMotorSpeeds;
 long lastLoopTime = millis();
-
+float loopTime = 0;
 uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
@@ -95,6 +102,15 @@ float minMagnitude(float x, float y, float z) {
     return currentMin;
 }
 
+struct Pose updatePose(struct Pose oldPosition, float heading, float distanceTravelled){
+    // takes current position, new heading and distance traveled to work out a new position
+    struct Pose newPosition;
+    newPosition.heading = heading;
+    newPosition.x = oldPosition.x + distanceTravelled * cos(heading);
+    newPosition.y = oldPosition.y + distanceTravelled * sin(heading);
+    return newPosition;
+}
+
 float batteryVoltage(){
     //reads ADC, interprets it and 
     //returns battery voltage as a float
@@ -106,6 +122,20 @@ float batteryVoltage(){
      //but they're wrong/outof spec
     voltage = ADC * (26.9+10.0)/10.0;
     return voltage;
+}
+
+float getDistanceTravelled(){
+   // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct 
+    float travelPerEncoderCount = 1.0;           //millimeters per encoder count. from testing
+    //compare old and latest encoder readings to see how much each wheel has rotated
+    //speed is distance/time and should be a float in mm/sec 
+    float wheelTravel[NUM_ENCODERS];
+    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+        wheelTravel[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) * travelPerEncoderCount;
+    }
+    float rightTravel = minMagnitude(wheelTravel[3], wheelTravel[5], wheelTravel[5]);
+    float leftTravel = minMagnitude(wheelTravel[0], wheelTravel[1], wheelTravel[1]);
+    return (leftTravel-rightTravel)/2;
 }
 
 struct Speeds feedForward(struct Speeds targetSpeeds){
@@ -159,7 +189,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     //. i.e power percentage proporational to difference
     // between desired speed and current actual wheel speed
     float kp = 0.03;  //ie. how much power to use for a given speed error
-    float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
+    loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
 
@@ -171,9 +201,11 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     }
     
     //most representative speed assumed to be slowest wheel
-    //#0 & #1 known to be on one side of bot, #3 & #5 on the other
-    //at the moment, I'm not sure which is is which though...
-    struct Speeds actualMotorSpeeds;
+    //#0, #1 & #3 is left,  #3, #4 & #5 is right
+    //#0 is front left     #3 is front right
+    //#1 is rear left      #4 is middle right
+    //#2 is middle left    #5 is rear right
+
     actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
     actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
 
@@ -183,7 +215,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     commandSpeeds.right = kp * (targetSpeeds.right - actualMotorSpeeds.right);
 
     //constrain output
-    float max_power=50;
+    float max_power=65;
     commandSpeeds.left =max(min(commandSpeeds.left, max_power), -max_power);
     commandSpeeds.right =-max(min(commandSpeeds.right, max_power), -max_power);
 
@@ -225,6 +257,7 @@ void post(){
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("Motors"));
+    display.display();
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
     // Initialise motor speeds
@@ -233,27 +266,32 @@ void post(){
     display.setCursor(0, 10);
     display.print("OK");
     display.display();
-    delay(1000);
+    delay(500);
 
     // Initialise serial transfer
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("Serial transfer"));
-    display.setCursor(0, 10);
+
+    display.display();
     display.print("OK");
     myTransfer.begin(Serial2);
     display.display();
-    delay(1000);
+    delay(500);
 
     // Initialise ToF sensors
     tcaselect(0);
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("ToF sensors"));
-    display.setCursor(0, 10);
+    display.display();
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
+        display.printf("initialising %d", t);
+        display.display();
         activeToFSensors[t] = sensor.init();
+        display.setCursor(0, display.getCursorY() + 1);
+        display.printf("init %d done", t);
 
         if (activeToFSensors[t]) {
             display.printf("%d: OK", t);
@@ -272,8 +310,11 @@ void post(){
             display.setCursor(64, display.getCursorY());
         }
         display.display();
-        delay(100);
+        delay(50);
     }
+    delay(500);
+    display.clearDisplay();
+    display.display();
 
     //initialise ADC
     display.clearDisplay();
@@ -295,34 +336,112 @@ void post(){
     display.clearDisplay();
     display.setCursor(0, 0);
     display.println(F("IMU"));
+    // Do we have an IMU
     if (!bno.begin()) {
         display.println("FAIL");
+        display.display();
+        delay(3000);
     } else {
         display.println("OK");
-    }
-    uint8_t system, gyro, accel, mag;
-    system = gyro = accel = mag = 0;
-
-    u_int8_t curYPos = display.getCursorY();
-    while (!system) {
-        bno.getCalibration(&system, &gyro, &accel, &mag);
-        display.setCursor(0, curYPos);
-        /* Display the individual values */
-        display.print("Sys:");
-        display.print(system, DEC);
-        display.print(" G:");
-        display.print(gyro, DEC);
-        display.print(" A:");
-        display.print(accel, DEC);
-        display.print(" M:");
-        display.println(mag, DEC);
         display.display();
-    };
-    display.println("calibrated OK");
-    display.display();
-    delay(2000);
+        delay(3000);
+
+        display.clearDisplay();
+        display.setCursor(0, 0);
+
+        // look for calibration data. if it exists, load it.
+        // if not, calibrate then store the data in the EEPROM
+        int eeAddress = 0;
+        long bnoID;
+        EEPROM.get(eeAddress, bnoID);
+
+        adafruit_bno055_offsets_t calibrationData;
+        sensor_t sensor;
+
+        bno.getSensor(&sensor);
+        if (bnoID != sensor.sensor_id) {
+            display.println("No Calibration Data in EEPROM");
+
+        } else {
+            display.println("Found Calibration in EEPROM.");
+            eeAddress += sizeof(long);
+            EEPROM.get(eeAddress, calibrationData);
+
+            display.println("Restoring...");
+            bno.setSensorOffsets(calibrationData);
+
+            display.println("Restored");
+        }
+        display.display();
+        delay(1000);
+
+        display.clearDisplay();
+        display.setCursor(0,0);
+        display.println("Move robot now to cehck calibration");
+        display.display();
+        delay(5000);
+        uint8_t system, gyro, accel, mag;
+        system = gyro = accel = mag = 0;
+        sensors_event_t event;
+        bno.getEvent(&event);
+        display.println("Move sensor to calibrate magnetometers");
+        display.display();
+        u_int8_t curYPos = display.getCursorY();
+        while (!system) {
+            bno.getCalibration(&system, &gyro, &accel, &mag);
+            /* Display the individual values */
+            display.setCursor(0, curYPos);
+            display.print("Sys:");
+            display.print(system, DEC);	
+            display.print(" G:");
+            display.print(gyro, DEC);
+            display.print(" A:");
+            display.print(accel, DEC);	
+            display.print(" M:");
+            display.println(mag, DEC);
+            display.setCursor(0, curYPos + 10);
+            /* Display the individual values */
+            delay(BNO055_SAMPLERATE_DELAY_MS);
+            display.print("X:");
+            display.print(event.orientation.x, 4);
+            display.print(" Y:");
+            display.print(event.orientation.y, 4);
+            display.print(" Z:");
+            display.println(event.orientation.z, 4);
+            display.display();
+            bno.getEvent(&event);
+            delay(BNO055_SAMPLERATE_DELAY_MS);
+        }
+        display.println("calibrated OK");
+        display.display();
+        delay(3000);
+
+        adafruit_bno055_offsets_t newCalib;
+        bno.getSensorOffsets(newCalib);
+        display.clearDisplay();
+        display.setCursor(0,0);
+        
+        display.println("Storing calibration data to EEPROM...");
+
+        eeAddress = 0;
+        bno.getSensor(&sensor);
+        bnoID = sensor.sensor_id;
+
+        EEPROM.put(eeAddress, bnoID);
+
+        eeAddress += sizeof(long);
+        EEPROM.put(eeAddress, newCalib);
+        display.println("Data stored to EEPROM.");
+        display.display();
+
+        delay(2000);
+    }
+
     display.clearDisplay();
+    display.setCursor(0,0);
+    display.println("Running");
     display.display();
+    currentPosition.heading = currentPosition.x = currentPosition.y = 0;
 }
 
 void setup() {
@@ -461,7 +580,7 @@ void loop() {
             myTransfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), recSize);
         } else {
             missedMotorMessageCount++;
-        }   
+        }
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
@@ -481,8 +600,6 @@ void loop() {
     float maxspeed_mm_per_sec = 3000;  //max acheivable is 8000
     targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
-
-
 
     //convert speed commands into predicted power
     // otherwise known as feedforward. We can do feedforward
@@ -524,15 +641,20 @@ void loop() {
         sensors_event_t orientationData;
         bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
 
-        orientationReading.x = orientationData.orientation.x;
-        orientationReading.y = orientationData.orientation.y;
-        orientationReading.z = orientationData.orientation.z;
+        orientationReading.x = radians(orientationData.orientation.x);
+        orientationReading.y = radians(orientationData.orientation.y);
+        orientationReading.z = radians(orientationData.orientation.z);
 
         for (u_int8_t n = 0; n < 4; n++) {
             lightSensors[n] = ads1115.readADC_SingleEnded(n);
         }
         uint16_t payloadSize = 0;
-
+        
+        //update odometry
+        previousPosition = currentPosition;
+        float distanceMoved = getDistanceTravelled();
+        currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
+        
         // Prepare the distance data
         myTransfer.txObj(distances, sizeof(distances), payloadSize);
         payloadSize += sizeof(distances);
@@ -544,6 +666,10 @@ void loop() {
         //Prepare IMU data
         myTransfer.txObj(orientationReading, sizeof(orientationReading), payloadSize);
         payloadSize += sizeof(orientationReading);
+        
+        //Prepare odometry data
+        myTransfer.txObj(currentPosition, sizeof(currentPosition), payloadSize);
+        payloadSize += sizeof(currentPosition);
 
         //Prepare ADC data
         myTransfer.txObj(lightSensors, sizeof(lightSensors), payloadSize);
