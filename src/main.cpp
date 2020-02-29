@@ -43,6 +43,8 @@ VL53L0X sensor;
 
 float distances[8];
 bool activeToFSensors[8];
+int16_t lightSensors[4];
+
 Encoder encoders[NUM_ENCODERS] = {
     Encoder(TEENSY_PIN_ENC1A, TEENSY_PIN_ENC1B),
     Encoder(TEENSY_PIN_ENC2A, TEENSY_PIN_ENC2B),
@@ -273,6 +275,22 @@ void post(){
         delay(100);
     }
 
+    //initialise ADC
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println(F("ADC"));
+    ads1115.begin();
+    display.println(F("Initialised"));
+    display.println(F("First reading:"));
+    for (u_int8_t n = 0; n < 4; n++) {
+        lightSensors[n] = ads1115.readADC_SingleEnded(n);
+    }
+    display.printf("FL: %d      FR: %d", lightSensors[2], lightSensors[0]);
+    display.println();
+    display.printf("BL: %d      BR: %d", lightSensors[1], lightSensors[3]);
+    display.display();
+    delay(2000);
+
     // //initialise IMU
     display.clearDisplay();
     display.setCursor(0, 0);
@@ -345,6 +363,7 @@ void setup() {
         enterPost = true;
         display.println("Entering POST...");
         display.display();
+        delay(500);
     }
 
     // Setup serial comms
@@ -426,23 +445,6 @@ void setup() {
         display.println("calibrated OK");
         display.display();
         delay(200);
-        display.clearDisplay();
-        display.display();
-        while (true){
-            display.clearDisplay();
-            display.setCursor(0, 0);
-            int16_t adc0, adc1, adc2, adc3;
-            adc0 = ads1115.readADC_SingleEnded(0);
-            adc1 = ads1115.readADC_SingleEnded(1);
-            adc2 = ads1115.readADC_SingleEnded(2);
-            adc3 = ads1115.readADC_SingleEnded(3);
-            display.printf("1: %d      2: %d", adc0, adc1);
-            display.println();
-            display.printf("3: %d      4: %d", adc2, adc3);
-            display.display();
-            delay(100);
-            //[3] = 4 = back right
-        }
     }
 }
 
@@ -526,7 +528,9 @@ void loop() {
         orientationReading.y = orientationData.orientation.y;
         orientationReading.z = orientationData.orientation.z;
 
-
+        for (u_int8_t n = 0; n < 4; n++) {
+            lightSensors[n] = ads1115.readADC_SingleEnded(n);
+        }
         uint16_t payloadSize = 0;
 
         // Prepare the distance data
@@ -540,6 +544,10 @@ void loop() {
         //Prepare IMU data
         myTransfer.txObj(orientationReading, sizeof(orientationReading), payloadSize);
         payloadSize += sizeof(orientationReading);
+
+        //Prepare ADC data
+        myTransfer.txObj(lightSensors, sizeof(lightSensors), payloadSize);
+        payloadSize += sizeof(lightSensors);
 
         // Send data
         myTransfer.sendData(payloadSize);
