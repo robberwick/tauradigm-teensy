@@ -192,6 +192,9 @@ void haltAndCatchFire() {
 
 void post(){
     
+    // do i2c scan
+    do_i2c_scan();
+    
     // Attach motors
     display.clearDisplay();
     display.setCursor(0, 0);
@@ -298,6 +301,7 @@ void do_i2c_scan() {
         }
     }
     display.display();
+    delay(4000);
 }
 
 void setup() {
@@ -359,9 +363,6 @@ void setup() {
     Serial2.begin(115200);
     while (!Serial2) {
     };
-
-    // do i2c scan
-    do_i2c_scan();
 
     if (enterPost) {
         post();
