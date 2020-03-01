@@ -215,8 +215,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     commandSpeeds.right = kp * (targetSpeeds.right - actualMotorSpeeds.right);
 
     //constrain output
-    float max_power=65;
-    commandSpeeds.left =max(min(commandSpeeds.left, max_power), -max_power);
+    float max_power=80;
     commandSpeeds.right =-max(min(commandSpeeds.right, max_power), -max_power);
 
     return commandSpeeds;
@@ -506,7 +505,7 @@ void setup() {
     };
 #endif
 
-    Serial2.begin(115200);
+    Serial2.begin(1000000);
     while (!Serial2) {
     };
 
