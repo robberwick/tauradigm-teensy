@@ -506,7 +506,7 @@ void setup() {
     };
 #endif
 
-    Serial2.begin(115200);
+    Serial2.begin(1000000);
     while (!Serial2) {
     };
 
@@ -594,16 +594,23 @@ void loop() {
     }
     bool shouldInvertDisplay = false;
     // Have we missed 5 valid motor messages?
+    
+    display.clearDisplay();
+    display.setCursor(0, 0);
     if (missedMotorMessageCount >= 10) {
         requestedMotorSpeeds.left = 0;
         requestedMotorSpeeds.right = 0;
         shouldInvertDisplay = true;
+        display.printf("missed message %d", missedMotorMessageCount);
+        display.display();
     }
     // is battery going flat?
     if (batteryVoltage() < minBatVoltage) {
         requestedMotorSpeeds.left = 0;
         requestedMotorSpeeds.right = 0;
         shouldInvertDisplay = true;
+        display.printf("low battery");
+        display.display();
     }
     display.invertDisplay(shouldInvertDisplay);
 
