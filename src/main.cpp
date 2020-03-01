@@ -64,7 +64,7 @@ long encoderReadings[NUM_ENCODERS];
 long oldEncoderReadings[NUM_ENCODERS];
 
 Adafruit_SSD1306 display(128, 64);
- 
+
 Adafruit_ADS1115 ads1115(ADC_ADDR);	// minesweeper ADC
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
@@ -112,7 +112,7 @@ struct Pose updatePose(struct Pose oldPosition, float heading, float distanceTra
 }
 
 float batteryVoltage(){
-    //reads ADC, interprets it and 
+    //reads ADC, interprets it and
     //returns battery voltage as a float
     float ADC, voltage;
     //AnalogRead returns 10bit fraction of Vdd
@@ -125,10 +125,10 @@ float batteryVoltage(){
 }
 
 float getDistanceTravelled(){
-   // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct 
+   // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct
     float travelPerEncoderCount = 1.0;           //millimeters per encoder count. from testing
     //compare old and latest encoder readings to see how much each wheel has rotated
-    //speed is distance/time and should be a float in mm/sec 
+    //speed is distance/time and should be a float in mm/sec
     float wheelTravel[NUM_ENCODERS];
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
         wheelTravel[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) * travelPerEncoderCount;
@@ -148,14 +148,14 @@ struct Speeds feedForward(struct Speeds targetSpeeds){
     float minTurnPower = 18;  //determined from practical testing
     float minForwardPower = 8;  //same
     float powerCoefficient = 113;  //same
-    float turnThreshold = 100;  //units: mm/sec. arbitary, value. 
+    float turnThreshold = 100;  //units: mm/sec. arbitary, value.
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
-    // the two would be better?  
+    // the two would be better?
 
    // since there's a min power needed to move (as defined above)
-   // first check if we're trying to move  
+   // first check if we're trying to move
     if (targetSpeeds.left != 0 and targetSpeeds.right != 0) {
         //then check if we're trying to turn or not, i.e. left and right speeds different
         if (abs(targetSpeeds.right - targetSpeeds.left) > turnThreshold) {
@@ -181,7 +181,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
    // apply PID
     // takes two speed commands in -100 to +100 and two
     // target speeds in mm/sec
-    // uses sensor feedback to correct for errors 
+    // uses sensor feedback to correct for errors
     // returns motor power -100 to +100%
     //inputs and outputs all Speed structs
 
@@ -194,12 +194,12 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
 
     //compare old and latest encoder readings to see how much each wheel has rotated
-    //speed is distance/time and should be a float in mm/sec 
+    //speed is distance/time and should be a float in mm/sec
     float motorSpeeds[NUM_ENCODERS];
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
         motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
     }
-    
+
     //most representative speed assumed to be slowest wheel
     //#0, #1 & #3 is left,  #3, #4 & #5 is right
     //#0 is front left     #3 is front right
@@ -235,7 +235,7 @@ void do_i2c_scan() {
         uint8_t data;
         if (!twi_writeTo(addr, &data, 0, 1, 1)) {
             //C++20 has a contains() method for unordered_map
-            // but find() is only one available to us?    
+            // but find() is only one available to us?
             if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()){
                 display.println(I2C_ADDRESS_NAMES.at(addr));
             } else {
@@ -249,7 +249,7 @@ void do_i2c_scan() {
 }
 
 void post(){
-    
+
     // do i2c scan
     do_i2c_scan();
 
@@ -397,11 +397,11 @@ void post(){
             /* Display the individual values */
             display.setCursor(0, curYPos);
             display.print("Sys:");
-            display.print(system, DEC);	
+            display.print(system, DEC);
             display.print(" G:");
             display.print(gyro, DEC);
             display.print(" A:");
-            display.print(accel, DEC);	
+            display.print(accel, DEC);
             display.print(" M:");
             display.println(mag, DEC);
             display.setCursor(0, curYPos + 10);
@@ -425,7 +425,7 @@ void post(){
         bno.getSensorOffsets(newCalib);
         display.clearDisplay();
         display.setCursor(0,0);
-        
+
         display.println("Storing calibration data to EEPROM...");
 
         eeAddress = 0;
@@ -471,7 +471,7 @@ void setup() {
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
     display.display();
     delay(3000);
-    
+
     pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
     display.clearDisplay();
     display.setCursor(0, 10);
@@ -592,21 +592,25 @@ void loop() {
             missedMotorMessageCount++;
         }
     }
+    bool shouldInvertDisplay = false;
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
         requestedMotorSpeeds.left = 0;
         requestedMotorSpeeds.right = 0;
+        shouldInvertDisplay = true;
     }
     // is battery going flat?
     if (batteryVoltage() < minBatVoltage) {
         requestedMotorSpeeds.left = 0;
         requestedMotorSpeeds.right = 0;
+        shouldInvertDisplay = true;
     }
+    display.invertDisplay(shouldInvertDisplay);
 
     //convert -100 - +100 percentage speed command into mm/sec
     // for autonomous control we could revert back to using full scale
     // but for manual control, and for testing speedcontrol precision
-    // better to start with limiting to lower speeds  
+    // better to start with limiting to lower speeds
     float maxspeed_mm_per_sec = 3000;  //max acheivable is 8000
     targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
@@ -614,14 +618,14 @@ void loop() {
     //convert speed commands into predicted power
     // otherwise known as feedforward. We can do feedforward
     // and/or PID speed control. both is better but either
-    // alone gives functional results 
-    
+    // alone gives functional results
+
     //get predicted motor powers from feedforward
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
 
     //apply PID to motor powers based on deviation from target speed
     commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
- 
+
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
@@ -659,12 +663,12 @@ void loop() {
             lightSensors[n] = ads1115.readADC_SingleEnded(n);
         }
         uint16_t payloadSize = 0;
-        
+
         //update odometry
         previousPosition = currentPosition;
         float distanceMoved = getDistanceTravelled();
         currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
-        
+
         // Prepare the distance data
         myTransfer.txObj(distances, sizeof(distances), payloadSize);
         payloadSize += sizeof(distances);
@@ -676,7 +680,7 @@ void loop() {
         //Prepare IMU data
         myTransfer.txObj(orientationReading, sizeof(orientationReading), payloadSize);
         payloadSize += sizeof(orientationReading);
-        
+
         //Prepare odometry data
         myTransfer.txObj(currentPosition, sizeof(currentPosition), payloadSize);
         payloadSize += sizeof(currentPosition);
