@@ -111,7 +111,7 @@ struct Pose updatePose(struct Pose oldPosition, float heading, float distanceTra
     newPosition.y = oldPosition.y + distanceTravelled * sin(heading);
     return newPosition;
 }
-    
+
 float wrapTwoPi(float angle) {
     //wraps an angle to stay within +/-pi
 	while (angle > M_PI) angle -= TWO_PI;
@@ -230,8 +230,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     commandSpeeds.right += fwdKp * (targetSpeeds.right - actualMotorSpeeds.right);
     float turnKp = 0.25;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
-    display.clearDisplay();
-    display.setCursor(0, 0);
+    display.println(" ");
     display.printf("target rate:%2.2f", targetTurnRate);
     display.println(" ");
     display.printf("actual rate:%2.2f", actualTurnRate);
