@@ -228,7 +228,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     float fwdKp = 0.03;  //ie. how much power to use for a given speed error
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
     commandSpeeds.right += fwdKp * (targetSpeeds.right - actualMotorSpeeds.right);
-    float turnKp = 0.25;
+    float turnKp = 15;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
     display.println(" ");
     display.printf("target rate:%2.2f", targetTurnRate);
@@ -236,6 +236,8 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     display.printf("actual rate:%2.2f", actualTurnRate);
     display.println(" ");
     display.printf("steering correction: %2.2f", steeringCorrection);
+    display.println(" ");
+    display.printf("heading: %2.2f", orientationReading.x);
     display.display();  
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right += steeringCorrection;
@@ -688,10 +690,9 @@ void loop() {
         sensors_event_t orientationData;
         bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
         oldOrientationReading = orientationReading;
-        orientationReading.x = orientationData.orientation.x;
-        orientationReading.y = orientationData.orientation.y;
-        orientationReading.z = orientationData.orientation.z;
-
+        orientationReading.x = radians(orientationData.orientation.x);
+        orientationReading.y = radians(orientationData.orientation.y);
+        orientationReading.z = radians(orientationData.orientation.z);
 
         for (u_int8_t n = 0; n < 4; n++) {
             lightSensors[n] = ads1115.readADC_SingleEnded(n);
