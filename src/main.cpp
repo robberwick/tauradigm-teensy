@@ -91,7 +91,7 @@ float minMagnitude(float x, float y, float z) {
 }
 
 float batteryVoltage(){
-    //reads ADC, interprets it and 
+    //reads ADC, interprets it and
     //returns battery voltage as a float
     float ADC, voltage;
     //AnalogRead returns 10bit fraction of Vdd
@@ -113,14 +113,14 @@ struct Speeds feedForward(struct Speeds targetSpeeds){
     float minTurnPower = 18;  //determined from practical testing
     float minForwardPower = 8;  //same
     float powerCoefficient = 113;  //same
-    float turnThreshold = 100;  //units: mm/sec. arbitary, value. 
+    float turnThreshold = 100;  //units: mm/sec. arbitary, value.
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
-    // the two would be better?  
+    // the two would be better?
 
    // since there's a min power needed to move (as defined above)
-   // first check if we're trying to move  
+   // first check if we're trying to move
     if (targetSpeeds.left != 0 and targetSpeeds.right != 0) {
         //then check if we're trying to turn or not, i.e. left and right speeds different
         if (abs(targetSpeeds.right - targetSpeeds.left) > turnThreshold) {
@@ -146,7 +146,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
    // apply PID
     // takes two speed commands in -100 to +100 and two
     // target speeds in mm/sec
-    // uses sensor feedback to correct for errors 
+    // uses sensor feedback to correct for errors
     // returns motor power -100 to +100%
     //inputs and outputs all Speed structs
 
@@ -159,12 +159,12 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
 
     //compare old and latest encoder readings to see how much each wheel has rotated
-    //speed is distance/time and should be a float in mm/sec 
+    //speed is distance/time and should be a float in mm/sec
     float motorSpeeds[NUM_ENCODERS];
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
         motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
     }
-    
+
     //most representative speed assumed to be slowest wheel
     //#0 & #1 known to be on one side of bot, #3 & #5 on the other
     //at the moment, I'm not sure which is is which though...
@@ -198,7 +198,7 @@ void do_i2c_scan() {
         uint8_t data;
         if (!twi_writeTo(addr, &data, 0, 1, 1)) {
             //C++20 has a contains() method for unordered_map
-            // but find() is only one available to us?    
+            // but find() is only one available to us?
             if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()){
                 display.println(I2C_ADDRESS_NAMES.at(addr));
             } else {
@@ -255,7 +255,7 @@ void setup() {
     };
 #endif
 
-    Serial2.begin(115200);
+    Serial2.begin(1000000);
     while (!Serial2) {
     };
 
@@ -364,7 +364,7 @@ void loop() {
             myTransfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), recSize);
         } else {
             missedMotorMessageCount++;
-        }   
+        }
     }
     // Have we missed 5 valid motor messages?
     if (missedMotorMessageCount >= 10) {
@@ -380,7 +380,7 @@ void loop() {
     //convert -100 - +100 percentage speed command into mm/sec
     // for autonomous control we could revert back to using full scale
     // but for manual control, and for testing speedcontrol precision
-    // better to start with limiting to lower speeds  
+    // better to start with limiting to lower speeds
     float maxspeed_mm_per_sec = 3000;  //max acheivable is 8000
     targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
@@ -390,14 +390,14 @@ void loop() {
     //convert speed commands into predicted power
     // otherwise known as feedforward. We can do feedforward
     // and/or PID speed control. both is better but either
-    // alone gives functional results 
-    
+    // alone gives functional results
+
     //get predicted motor powers from feedforward
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
 
     //apply PID to motor powers based on deviation from target speed
     commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
- 
+
     // Write motorspeeds
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
