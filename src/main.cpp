@@ -31,6 +31,7 @@ long lastLoopTime = millis();
 uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
+float trackWidth = 136;
 
 SerialTransfer myTransfer;
 
@@ -60,7 +61,7 @@ struct OrientationReading {
     float x;
     float y;
     float z;
-} orientationReading;
+} orientationReading, oldOrientationReading;
 
 void tcaselect(uint8_t i) {
     if (i > 7) {
@@ -88,6 +89,13 @@ float minMagnitude(float x, float y, float z) {
         currentMin = z;
     }
     return currentMin;
+}
+
+float wrapTwoPi(float angle) {
+    //wraps an angle to stay within +/-pi
+	while (angle > M_PI) angle -= TWO_PI;
+	while (angle < -M_PI) angle += TWO_PI;
+	return angle;
 }
 
 float batteryVoltage(){
@@ -153,11 +161,14 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     // or at the moment, just proportional
     //. i.e power percentage proporational to difference
     // between desired speed and current actual wheel speed
-    float kp = 0.03;  //ie. how much power to use for a given speed error
-    float loopTime = (millis() - lastLoopTime)/1000.0;  // divide by 1000 converts to seconds.
+
+    float loopTime = (millis() - lastLoopTime) / 1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
 
+    //work out target turn rate    
+    float targetTurnRate = (targetSpeeds.left - targetSpeeds.right) / trackWidth;
+    
     //compare old and latest encoder readings to see how much each wheel has rotated
     //speed is distance/time and should be a float in mm/sec
     float motorSpeeds[NUM_ENCODERS];
@@ -172,10 +183,26 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
     actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
 
+    //work out actual turn rate
+    float actualTurnRate = wrapTwoPi(orientationReading.x - oldOrientationReading.x) / loopTime;
+
     // do actual Proportional calc.
     //speed error is target - actual.
-    commandSpeeds.left = kp * (targetSpeeds.left - actualMotorSpeeds.left);
-    commandSpeeds.right = kp * (targetSpeeds.right - actualMotorSpeeds.right);
+    float fwdKp = 0.03;  //ie. how much power to use for a given speed error
+    commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
+    commandSpeeds.right += fwdKp * (targetSpeeds.right - actualMotorSpeeds.right);
+    float turnKp = 0.25;
+    float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.printf("target rate:%2.2f", targetTurnRate);
+    display.println(" ");
+    display.printf("actual rate:%2.2f", actualTurnRate);
+    display.println(" ");
+    display.printf("steering correction: %2.2f", steeringCorrection);
+    display.display();  
+    commandSpeeds.left += steeringCorrection;
+    commandSpeeds.right += steeringCorrection;
 
     //constrain output
     float max_power=50;
@@ -426,7 +453,7 @@ void loop() {
         // Read IMU
         sensors_event_t orientationData;
         bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
-
+        oldOrientationReading = orientationReading;
         orientationReading.x = orientationData.orientation.x;
         orientationReading.y = orientationData.orientation.y;
         orientationReading.z = orientationData.orientation.z;
