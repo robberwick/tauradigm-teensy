@@ -33,7 +33,10 @@ struct Pose {
 struct Speeds {
     float left;
     float right;
-} commandMotorSpeeds, targetMotorSpeeds, requestedMotorSpeeds, actualMotorSpeeds;
+};
+
+Speeds deadStop = {0, 0};
+
 long lastLoopTime = millis();
 float loopTime = 0;
 uint32_t missedMotorMessageCount = 0;
@@ -168,7 +171,7 @@ struct Speeds feedForward(struct Speeds targetSpeeds){
         //then check if we're trying to turn or not, i.e. left and right speeds different
         if (abs(targetSpeeds.right - targetSpeeds.left) > turnThreshold) {
             //then predict power needed to acheive that speed. formule derived from curve fitting experimental results
-            float turnComponent = sgn(targetSpeeds.right - targetSpeeds.left) * (abs(targetSpeeds.right - targetMotorSpeeds.left) / powerCoefficient + minTurnPower);
+            float turnComponent = sgn(targetSpeeds.right - targetSpeeds.left) * (abs(targetSpeeds.right - targetSpeeds.left) / powerCoefficient + minTurnPower);
             float forwardComponent = (targetSpeeds.right + targetSpeeds.left) / 2 / powerCoefficient;
             commandSpeeds.right = turnComponent + forwardComponent;
             commandSpeeds.left = -turnComponent + forwardComponent;
@@ -201,9 +204,9 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     lastLoopTime = millis();
     float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
 
-    //work out target turn rate    
+    //work out target turn rate
     float targetTurnRate = (targetSpeeds.left - targetSpeeds.right) / trackWidth;
-    
+
     //compare old and latest encoder readings to see how much each wheel has rotated
     //speed is distance/time and should be a float in mm/sec
     float motorSpeeds[NUM_ENCODERS];
@@ -216,6 +219,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     //#0 is front left     #3 is front right
     //#1 is rear left      #4 is middle right
     //#2 is middle left    #5 is rear right
+    Speeds actualMotorSpeeds;
 
     actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
     actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
@@ -238,7 +242,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     display.printf("steering correction: %2.2f", steeringCorrection);
     display.println(" ");
     display.printf("heading: %2.2f", orientationReading.x);
-    display.display();  
+    display.display();
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right += steeringCorrection;
 
@@ -276,8 +280,55 @@ void do_i2c_scan() {
     delay(4000);
 }
 
-void post(){
+void incrementMissedMotorCount() {
+    missedMotorMessageCount++;
+}
 
+void resetMissedMotorCount() {
+    missedMotorMessageCount = 0;
+}
+
+void setMotorSpeeds(Speeds requestedMotorSpeeds) {
+    Speeds commandMotorSpeeds, targetMotorSpeeds;
+
+    //convert -100 - +100 percentage speed command into mm/sec
+    // for autonomous control we could revert back to using full scale
+    // but for manual control, and for testing speedcontrol precision
+    // better to start with limiting to lower speeds
+    float maxspeed_mm_per_sec = 3000;  //max acheivable is 8000
+    targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
+    targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
+
+    //convert speed commands into predicted power
+    // otherwise known as feedforward. We can do feedforward
+    // and/or PID speed control. both is better but either
+    // alone gives functional results
+
+    //get predicted motor powers from feedforward
+    commandMotorSpeeds = feedForward(targetMotorSpeeds);
+
+    //apply PID to motor powers based on deviation from target speed
+    commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
+}
+
+void processMessage(SerialTransfer &transfer) {
+    // Get message type, indicated by the first byte of the message
+    uint8_t messageType = myTransfer.rxBuff[0];
+    switch (messageType) {
+        // 0 - motor speed message
+        case 0:
+        default:
+            Speeds requestedMotorSpeeds;
+            myTransfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), sizeof(messageType));
+            setMotorSpeeds(requestedMotorSpeeds);
+            // reset the missed motor mdessage count
+            resetMissedMotorCount();
+            // We received a valid motor command, so reset the timer
+            sendMessage.restart();
+    }
+}
+
+void post(){
     // do i2c scan
     do_i2c_scan();
 
@@ -288,9 +339,6 @@ void post(){
     display.display();
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
-    // Initialise motor speeds
-    requestedMotorSpeeds.left = 0;
-    requestedMotorSpeeds.right = 0;
     display.setCursor(0, 10);
     display.print("OK");
     display.display();
@@ -544,9 +592,9 @@ void setup() {
         // Attach motors
         motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
         motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
-        // Initialise motor speeds
-        requestedMotorSpeeds.left = 0;
-        requestedMotorSpeeds.right = 0;
+
+        // Set motors to stop
+        setMotorSpeeds(deadStop);
 
         // Initialise serial transfer
         myTransfer.begin(Serial2);
@@ -606,64 +654,46 @@ void setup() {
 }
 
 void loop() {
-    // If the message sending timeout has passed then attempt to read
-    // motor speeds and apply them
-    if (sendMessage.hasPassed(20)) {
-        // restart the timeout
-        sendMessage.restart();
-        if (myTransfer.available()) {
-            // reset missing motor message count
-            missedMotorMessageCount = 0;
-            uint8_t recSize = 0;
-            myTransfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), recSize);
-        } else {
-            missedMotorMessageCount++;
-        }
+
+    // Is there an incoming message available?
+    if (myTransfer.available()) {
+        processMessage(myTransfer);
     }
+
+    // if the message sending timeout has passed then increment the missed count
+    // and reset
+    if (sendMessage.hasPassed(20)) {
+        incrementMissedMotorCount();
+        sendMessage.restart();
+    }
+
     bool shouldInvertDisplay = false;
-    // Have we missed 5 valid motor messages?
-    
+    // Have we missed 10 valid motor messages?
+
     display.clearDisplay();
     display.setCursor(0, 0);
     if (missedMotorMessageCount >= 10) {
-        requestedMotorSpeeds.left = 0;
-        requestedMotorSpeeds.right = 0;
         shouldInvertDisplay = true;
         display.printf("missed message %d", missedMotorMessageCount);
         display.display();
     }
     // is battery going flat?
     if (batteryVoltage() < minBatVoltage) {
-        requestedMotorSpeeds.left = 0;
-        requestedMotorSpeeds.right = 0;
         shouldInvertDisplay = true;
         display.printf("low battery");
         display.display();
     }
+
     display.invertDisplay(shouldInvertDisplay);
 
-    //convert -100 - +100 percentage speed command into mm/sec
-    // for autonomous control we could revert back to using full scale
-    // but for manual control, and for testing speedcontrol precision
-    // better to start with limiting to lower speeds
-    float maxspeed_mm_per_sec = 3000;  //max acheivable is 8000
-    targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
-    targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
-    //convert speed commands into predicted power
-    // otherwise known as feedforward. We can do feedforward
-    // and/or PID speed control. both is better but either
-    // alone gives functional results
+    // If we have missed 10 valid motor messages
+    // or the battery is going flat
+    // set motors to dead stop
+    if ((missedMotorMessageCount >= 10) || (batteryVoltage() < minBatVoltage)) {
+        setMotorSpeeds(deadStop);
+    }
 
-    //get predicted motor powers from feedforward
-    commandMotorSpeeds = feedForward(targetMotorSpeeds);
-
-    //apply PID to motor powers based on deviation from target speed
-    commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
-
-    // Write motorspeeds
-    motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
-    motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
