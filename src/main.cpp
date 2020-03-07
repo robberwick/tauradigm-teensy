@@ -288,7 +288,7 @@ void resetMissedMotorCount() {
     missedMotorMessageCount = 0;
 }
 
-void setMotorSpeeds(Speeds requestedMotorSpeeds) {
+void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorRight) {
     Speeds commandMotorSpeeds, targetMotorSpeeds;
 
     //convert -100 - +100 percentage speed command into mm/sec
@@ -309,6 +309,9 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds) {
 
     //apply PID to motor powers based on deviation from target speed
     commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
+
+    motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
 
 void processMessage(SerialTransfer &transfer) {
@@ -320,7 +323,7 @@ void processMessage(SerialTransfer &transfer) {
         default:
             Speeds requestedMotorSpeeds;
             transfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), sizeof(messageType));
-            setMotorSpeeds(requestedMotorSpeeds);
+            setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
             // reset the missed motor mdessage count
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
@@ -594,7 +597,7 @@ void setup() {
         motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
 
         // Set motors to stop
-        setMotorSpeeds(deadStop);
+        setMotorSpeeds(deadStop, motorLeft, motorRight);
 
         // Initialise serial transfer
         myTransfer.begin(Serial2);
@@ -691,7 +694,7 @@ void loop() {
     // or the battery is going flat
     // set motors to dead stop
     if ((missedMotorMessageCount >= 10) || (batteryVoltage() < minBatVoltage)) {
-        setMotorSpeeds(deadStop);
+        setMotorSpeeds(deadStop, motorLeft, motorRight);
     }
 
 
