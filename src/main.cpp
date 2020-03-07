@@ -19,7 +19,7 @@ extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
 
-//#define DEBUG
+// #define DEBUG
 
 Servo motorLeft;
 Servo motorRight;
@@ -48,7 +48,7 @@ SerialTransfer myTransfer;
 
 int8_t step = 1;
 
-Chrono sendMessage;
+Chrono receiveMessage;
 Chrono readSensors;
 VL53L0X sensor;
 
@@ -313,18 +313,18 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds) {
 
 void processMessage(SerialTransfer &transfer) {
     // Get message type, indicated by the first byte of the message
-    uint8_t messageType = myTransfer.rxBuff[0];
+    uint8_t messageType = transfer.rxBuff[0];
     switch (messageType) {
         // 0 - motor speed message
-        case 0:
+        case 1:
         default:
             Speeds requestedMotorSpeeds;
-            myTransfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), sizeof(messageType));
+            transfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), sizeof(messageType));
             setMotorSpeeds(requestedMotorSpeeds);
             // reset the missed motor mdessage count
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
-            sendMessage.restart();
+            receiveMessage.restart();
     }
 }
 
@@ -662,9 +662,9 @@ void loop() {
 
     // if the message sending timeout has passed then increment the missed count
     // and reset
-    if (sendMessage.hasPassed(20)) {
+    if (receiveMessage.hasPassed(20)) {
         incrementMissedMotorCount();
-        sendMessage.restart();
+        receiveMessage.restart();
     }
 
     bool shouldInvertDisplay = false;
