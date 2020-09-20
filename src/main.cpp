@@ -298,7 +298,7 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     // but for manual control, and for testing speedcontrol precision
     // better to start with limiting to lower speeds
     float maxspeed_mm_per_sec = 3000;  //max acheivable is 8000
-    targetMotorSpeeds.right = -requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
+    targetMotorSpeeds.right = requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
     //convert speed commands into predicted power
