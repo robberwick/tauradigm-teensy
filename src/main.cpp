@@ -34,6 +34,8 @@ struct Speeds {
     float left;
     float right;
 };
+float averageSpeed;
+float minSpeed = 0.01;
 
 Speeds deadStop = {0, 0};
 
@@ -131,7 +133,7 @@ float batteryVoltage(){
 
      //ADC reads battery via a potential divider of 33k and 10k
      //but they're wrong/outof spec
-    voltage = ADC * (26.9+10.0)/10.0;
+    voltage = ADC * (26.9+10.0)/10.0+4;
     return voltage;
 }
 
@@ -306,9 +308,17 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 
     //get predicted motor powers from feedforward
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
+    
+    // check if the command speed has been close to zero for a while
+    averageSpeed = 0.7 * averageSpeed + 0.3 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right)); 
 
-    //apply PID to motor powers based on deviation from target speed
-    commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
+    //if its been zero for a while, just stop, else work out the PID modified speeds
+    if (averageSpeed < minSpeed) {
+      commandMotorSpeeds = deadStop;
+    } else {
+      //apply PID to motor powers based on deviation from target speed
+      commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
+    }
 
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
