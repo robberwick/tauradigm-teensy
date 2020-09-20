@@ -25,6 +25,8 @@ HardwareSerial Serial2(USART2);
 
 Servo motorLeft;
 Servo motorRight;
+Servo esc_1;
+Servo esc_2;
 
 struct Pose {
     float heading;
@@ -132,15 +134,9 @@ float batteryVoltage() {
     //AnalogRead returns 10bit fraction of Vdd
     adcReading = analogRead(TEENSY_PIN_BATT_SENSE) * 3.3 / 1023.0;
 
-<<<<<<< HEAD
      //ADC reads battery via a potential divider of 33k and 10k
      //but they're wrong/out of spec ((33+10)/10 = 4.3)
-    voltage = ADC * 3.71;
-=======
-    //ADC reads battery via a potential divider of 33k and 10k
-    //but they're wrong/outof spec
-    voltage = adcReading * (26.9 + 10.0) / 10.0 + 4;
->>>>>>> master
+    voltage = adcReading * 3.71;
     return voltage;
 }
 Speeds getWheelTravel() {
@@ -335,12 +331,16 @@ void processMessage(SerialTransfer &transfer) {
         case 1:
         default:
             Speeds requestedMotorSpeeds;
-            transfer.rxObj(requestedMotorSpeeds, recSize);
+            float messages[4];
+            transfer.rxObj(messages, sizeof(messages), sizeof(messageType));
+            requestedMotorSpeeds = {messages[0], messages[1]};
             setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
             // reset the missed motor mdessage count
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessage.restart();
+            esc_1.writeMicroseconds(map(messages[2], -100, 100, 1000, 2000));
+            esc_2.writeMicroseconds(map(messages[3], -100, 100, 1000, 2000));
     }
 }
 
@@ -605,6 +605,8 @@ void setup() {
         // Attach motors
         motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
         motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
+        esc_1.attach(TEENSY_PIN_LH_BALL_ESC);
+        esc_2.attach(TEENSY_PIN_RH_BALL_ESC);
 
         // Set motors to stop
         setMotorSpeeds(deadStop, motorLeft, motorRight);
