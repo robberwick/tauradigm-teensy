@@ -342,8 +342,8 @@ void processMessage(SerialTransfer &transfer) {
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessage.restart();
-            esc_1.writeMicroseconds(map(messages[2], -100, 100, 1000, 2000));
-            esc_2.writeMicroseconds(map(messages[3], -100, 100, 1000, 2000));
+            esc_1.writeMicroseconds(map(messages[2], -1, 1, 1000, 2000));
+            esc_2.writeMicroseconds(map(messages[3], -1, 1, 1000, 2000));
     }
 }
 
