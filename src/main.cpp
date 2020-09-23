@@ -332,7 +332,6 @@ void processMessage(SerialTransfer &transfer) {
     switch (messageType) {
         // 0 - motor speed message
         case 1:
-        default:
             Speeds requestedMotorSpeeds;
             float messages[4];
             transfer.rxObj(messages, sizeof(messages), sizeof(messageType));
@@ -342,8 +341,41 @@ void processMessage(SerialTransfer &transfer) {
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessage.restart();
-            esc_1.writeMicroseconds(map(messages[2], -1, 1, 1000, 2000));
-            esc_2.writeMicroseconds(map(messages[3], -1, 1, 1000, 2000));
+            break;
+        case 2:
+            char button;
+            transfer.rxObj(button, sizeof(button), sizeof(messageType));
+            switch (button) {
+                case 'c':
+                    esc_1.writeMicroseconds(1000);
+                    display.println(F("c"));
+                    display.display();
+                    delay(1000);
+                    break;
+                case 'x':
+                    esc_2.writeMicroseconds(1000);
+                    display.println(F("x"));
+                    display.display();
+                    delay(1000);
+                    break;
+                case 's':
+                    esc_1.writeMicroseconds(2000);
+                    display.println(F("s"));
+                    display.display();
+                    delay(1000);
+                    break;
+                case 't':
+                    esc_2.writeMicroseconds(2000);
+                    display.println(F("t"));
+                    display.display();
+                    delay(1000);
+                    break;
+            }
+            break;
+        default:
+            display.printf("invalid message type received %i", messageType);
+            display.display();
+            delay(500);        
     }
 }
 
