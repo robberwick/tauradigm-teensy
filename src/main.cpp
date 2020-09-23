@@ -308,9 +308,9 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 
     //get predicted motor powers from feedforward
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
-    
+
     // check if the command speed has been close to zero for a while
-    averageSpeed = 0.7 * averageSpeed + 0.3 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right)); 
+    averageSpeed = 0.7 * averageSpeed + 0.3 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
 
     //if its been zero for a while, just stop, else work out the PID modified speeds
     if (averageSpeed < minSpeed) {
@@ -325,14 +325,19 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 }
 
 void processMessage(SerialTransfer &transfer) {
+    // use this variable to keep track of how many
+    // bytes we've processed from the receive buffer
+    uint16_t recSize = 0;
+
     // Get message type, indicated by the first byte of the message
-    uint8_t messageType = transfer.rxBuff[0];
+    uint8_t messageType ;
+    recSize = myTransfer.rxObj(messageType, recSize);
     switch (messageType) {
         // 0 - motor speed message
         case 1:
         default:
             Speeds requestedMotorSpeeds;
-            transfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), sizeof(messageType));
+            transfer.rxObj(requestedMotorSpeeds, recSize);
             setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
             // reset the missed motor mdessage count
             resetMissedMotorCount();
@@ -756,24 +761,19 @@ void loop() {
         currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
 
         // Prepare the distance data
-        myTransfer.txObj(distances, sizeof(distances), payloadSize);
-        payloadSize += sizeof(distances);
+        payloadSize = myTransfer.txObj(distances, payloadSize);
 
         //Prepare encoder data
-        myTransfer.txObj(encoderReadings, sizeof(encoderReadings), payloadSize);
-        payloadSize += sizeof(encoderReadings);
+        payloadSize = myTransfer.txObj(encoderReadings, payloadSize);
 
         //Prepare IMU data
-        myTransfer.txObj(orientationReading, sizeof(orientationReading), payloadSize);
-        payloadSize += sizeof(orientationReading);
+        payloadSize = myTransfer.txObj(orientationReading, payloadSize);
 
         //Prepare odometry data
-        myTransfer.txObj(currentPosition, sizeof(currentPosition), payloadSize);
-        payloadSize += sizeof(currentPosition);
+        payloadSize = myTransfer.txObj(currentPosition, payloadSize);
 
         //Prepare ADC data
-        myTransfer.txObj(lightSensors, sizeof(lightSensors), payloadSize);
-        payloadSize += sizeof(lightSensors);
+        payloadSize = myTransfer.txObj(lightSensors, payloadSize);
 
         // Send data
         myTransfer.sendData(payloadSize);
