@@ -73,8 +73,6 @@ long oldEncoderReadings[NUM_ENCODERS];
 
 Adafruit_SSD1306 display(128, 64);
 
-Adafruit_ADS1115 ads1115(ADC_ADDR);  // minesweeper ADC
-
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
 struct OrientationReading {
     float x;
@@ -418,22 +416,6 @@ void post() {
     display.clearDisplay();
     display.display();
 
-    //initialise ADC
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("ADC"));
-    ads1115.begin();
-    display.println(F("Initialised"));
-    display.println(F("First reading:"));
-    for (u_int8_t n = 0; n < 4; n++) {
-        lightSensors[n] = ads1115.readADC_SingleEnded(n);
-    }
-    display.printf("FL: %d      FR: %d", lightSensors[2], lightSensors[0]);
-    display.println();
-    display.printf("BL: %d      BR: %d", lightSensors[1], lightSensors[3]);
-    display.display();
-    delay(2000);
-
     // //initialise IMU
     display.clearDisplay();
     display.setCursor(0, 0);
@@ -652,8 +634,6 @@ void setup() {
                 sensor.startContinuous();
             }
         }
-        //initialise ADC
-        ads1115.begin();
 
         // //initialise IMU
         display.clearDisplay();
@@ -755,9 +735,6 @@ void loop() {
         orientationReading.y = radians(orientationData.orientation.y);
         orientationReading.z = radians(orientationData.orientation.z);
 
-        for (u_int8_t n = 0; n < 4; n++) {
-            lightSensors[n] = ads1115.readADC_SingleEnded(n);
-        }
         uint16_t payloadSize = 0;
 
         //update odometry
@@ -776,9 +753,6 @@ void loop() {
 
         //Prepare odometry data
         payloadSize = myTransfer.txObj(currentPosition, payloadSize);
-
-        //Prepare ADC data
-        payloadSize = myTransfer.txObj(lightSensors, payloadSize);
 
         // Send data
         myTransfer.sendData(payloadSize);
