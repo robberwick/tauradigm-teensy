@@ -13,13 +13,13 @@
 #include <utility/imumaths.h>
 #include "Wire.h"
 #include "graphics.h"
-#include "teensy_config.h"
-
-extern "C" {
-#include "utility/twi.h"  // from Wire library, so we can do bus scanning
-}
+#include "config.h"
 
 // #define DEBUG
+
+#ifndef ARDUINO_TEENSY31
+HardwareSerial Serial2(USART2);
+#endif
 
 Servo motorLeft;
 Servo motorRight;
@@ -127,13 +127,13 @@ float wrapTwoPi(float angle) {
 float batteryVoltage(){
     //reads ADC, interprets it and
     //returns battery voltage as a float
-    float ADC, voltage;
+    float adcReading, voltage;
     //AnalogRead returns 10bit fraction of Vdd
-    ADC = analogRead(TEENSY_PIN_BATT_SENSE)*3.3/1023.0;
+    adcReading = analogRead(TEENSY_PIN_BATT_SENSE)*3.3/1023.0;
 
      //ADC reads battery via a potential divider of 33k and 10k
      //but they're wrong/outof spec
-    voltage = ADC * (26.9+10.0)/10.0+4;
+    voltage = adcReading * (26.9+10.0)/10.0+4;
     return voltage;
 }
 
@@ -266,8 +266,8 @@ void do_i2c_scan() {
     display.setCursor(0, 0);
     display.println("I2c Devices");
     for (uint8_t addr = 1; addr <= 127; addr++) {
-        uint8_t data;
-        if (!twi_writeTo(addr, &data, 0, 1, 1)) {
+        Wire.beginTransmission(addr);
+        if (!Wire.endTransmission() == 0) {
             //C++20 has a contains() method for unordered_map
             // but find() is only one available to us?
             if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()){
