@@ -312,9 +312,11 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
     
     // check if the command speed has been close to zero for a while
+    // if it is, we're probably are stopped and want to be stopped
     averageSpeed = 0.7 * averageSpeed + 0.3 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right)); 
 
     //if its been zero for a while, just stop, else work out the PID modified speeds
+    //not applying PID when stopped, stops the motors going crazy if the robot is carried
     if (averageSpeed < minSpeed) {
       commandMotorSpeeds = deadStop;
     } else {
@@ -347,28 +349,28 @@ void processMessage(SerialTransfer &transfer) {
             transfer.rxObj(button, sizeof(button), sizeof(messageType));
             switch (button) {
                 case 'c':
-                    esc_1.writeMicroseconds(1000);
-                    display.println(F("c"));
+                    esc_1.writeMicroseconds(900);
+                    display.println(F("jaw closing"));
                     display.display();
-                    delay(1000);
+                    delay(200);
                     break;
                 case 'x':
-                    esc_2.writeMicroseconds(1000);
-                    display.println(F("x"));
+                    esc_2.writeMicroseconds(1300);
+                    display.println(F("jaw down"));
                     display.display();
-                    delay(1000);
+                    delay(200);
                     break;
                 case 's':
-                    esc_1.writeMicroseconds(2000);
-                    display.println(F("s"));
+                    esc_1.writeMicroseconds(1600);
+                    display.println(F("jaw opening"));
                     display.display();
-                    delay(1000);
+                    delay(200);
                     break;
                 case 't':
-                    esc_2.writeMicroseconds(2000);
-                    display.println(F("t"));
+                    esc_2.writeMicroseconds(2100);
+                    display.println(F("jaw up"));
                     display.display();
-                    delay(1000);
+                    delay(200);
                     break;
             }
             break;
