@@ -19,6 +19,10 @@ extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
 }
 
+#ifndef GIT_REV
+#define GIT_REV "xxxxxxx"
+#endif
+
 // #define DEBUG
 
 Servo motorLeft;
