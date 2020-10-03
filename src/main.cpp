@@ -14,6 +14,7 @@
 #include "Wire.h"
 #include "graphics.h"
 #include "teensy_config.h"
+#include "enums.h"
 
 extern "C" {
 #include "utility/twi.h"  // from Wire library, so we can do bus scanning
@@ -27,6 +28,10 @@ extern "C" {
 
 Servo motorLeft;
 Servo motorRight;
+
+struct SystemDataMessage {uint8_t type; char hash[8];}
+systemDataMessage = {MessageTypes::SYSTEM_STATUS_DATA, GIT_REV};
+
 
 struct Pose {
     float heading;
@@ -338,7 +343,7 @@ void processMessage(SerialTransfer &transfer) {
     recSize = myTransfer.rxObj(messageType, recSize);
     switch (messageType) {
         // 0 - motor speed message
-        case 1:
+        case MessageTypes::MOTOR_COMMAND:
         default:
             Speeds requestedMotorSpeeds;
             transfer.rxObj(requestedMotorSpeeds, recSize);
@@ -347,6 +352,11 @@ void processMessage(SerialTransfer &transfer) {
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessage.restart();
+            break;
+
+        case MessageTypes::SYSTEM_STATUS_REQUEST:
+            uint16_t payloadSize = 0;
+            transfer.txObj(systemDataMessage, sizeof(systemDataMessage), payloadSize);
     }
 }
 
