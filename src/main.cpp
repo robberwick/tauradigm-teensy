@@ -329,7 +329,7 @@ void processMessage(SerialTransfer &transfer) {
     uint8_t messageType = transfer.rxBuff[0];
     switch (messageType) {
         // 0 - motor speed message
-        case 1:
+        case 0:
         default:
             Speeds requestedMotorSpeeds;
             transfer.rxObj(requestedMotorSpeeds, sizeof(requestedMotorSpeeds), sizeof(messageType));
@@ -754,6 +754,10 @@ void loop() {
         previousPosition = currentPosition;
         float distanceMoved = getDistanceTravelled();
         currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
+
+        uint8_t messageType = 1;
+        myTransfer.txObj(messageType, sizeof(messageType), payloadSize);
+        payloadSize += sizeof(messageType);
 
         // Prepare the distance data
         myTransfer.txObj(distances, sizeof(distances), payloadSize);
