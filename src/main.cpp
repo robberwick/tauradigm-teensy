@@ -471,7 +471,7 @@ void post(){
 
         display.clearDisplay();
         display.setCursor(0,0);
-        display.println("Move robot now to cehck calibration");
+        display.println("Move robot now to check calibration");
         display.display();
         delay(5000);
         uint8_t system, gyro, accel, mag;
@@ -562,6 +562,14 @@ void setup() {
     delay(3000);
 
     pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
+    display.clearDisplay();
+    display.setCursor(0, 10);
+    display.println("Git Branch:");
+    display.println(GIT_BRANCH);
+    display.println("Git commit hash:");
+    display.println(GIT_REV);
+    display.display();
+    delay(2000);
     display.clearDisplay();
     display.setCursor(0, 10);
     display.println("Press button now to  enter POST");
