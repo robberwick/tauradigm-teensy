@@ -1,9 +1,8 @@
+#include <Adafruit_ADS1015.h>
 #include <Adafruit_BNO055.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_Sensor.h>
-#include <Adafruit_ADS1015.h>
 #include <Arduino.h>
-#include <unordered_map>
 #include <Chrono.h>
 #include <EEPROM.h>
 #include <Encoder.h>
@@ -11,6 +10,9 @@
 #include <Servo.h>
 #include <VL53L0X.h>
 #include <utility/imumaths.h>
+
+#include <unordered_map>
+
 #include "Wire.h"
 #include "graphics.h"
 #include "teensy_config.h"
@@ -71,7 +73,7 @@ long oldEncoderReadings[NUM_ENCODERS];
 
 Adafruit_SSD1306 display(128, 64);
 
-Adafruit_ADS1115 ads1115(ADC_ADDR);	// minesweeper ADC
+Adafruit_ADS1115 ads1115(ADC_ADDR);  // minesweeper ADC
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
 struct OrientationReading {
@@ -108,7 +110,7 @@ float minMagnitude(float x, float y, float z) {
     return currentMin;
 }
 
-struct Pose updatePose(struct Pose oldPosition, float heading, float distanceTravelled){
+struct Pose updatePose(struct Pose oldPosition, float heading, float distanceTravelled) {
     // takes current position, new heading and distance traveled to work out a new position
     struct Pose newPosition;
     newPosition.heading = heading;
@@ -119,27 +121,27 @@ struct Pose updatePose(struct Pose oldPosition, float heading, float distanceTra
 
 float wrapTwoPi(float angle) {
     //wraps an angle to stay within +/-pi
-	while (angle > M_PI) angle -= TWO_PI;
-	while (angle < -M_PI) angle += TWO_PI;
-	return angle;
+    while (angle > M_PI) angle -= TWO_PI;
+    while (angle < -M_PI) angle += TWO_PI;
+    return angle;
 }
 
-float batteryVoltage(){
+float batteryVoltage() {
     //reads ADC, interprets it and
     //returns battery voltage as a float
     float ADC, voltage;
     //AnalogRead returns 10bit fraction of Vdd
-    ADC = analogRead(TEENSY_PIN_BATT_SENSE)*3.3/1023.0;
+    ADC = analogRead(TEENSY_PIN_BATT_SENSE) * 3.3 / 1023.0;
 
-     //ADC reads battery via a potential divider of 33k and 10k
-     //but they're wrong/outof spec
-    voltage = ADC * (26.9+10.0)/10.0+4;
+    //ADC reads battery via a potential divider of 33k and 10k
+    //but they're wrong/outof spec
+    voltage = ADC * (26.9 + 10.0) / 10.0 + 4;
     return voltage;
 }
 
-float getDistanceTravelled(){
-   // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct
-    float travelPerEncoderCount = 1.0;           //millimeters per encoder count. from testing
+float getDistanceTravelled() {
+    // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct
+    float travelPerEncoderCount = 1.0;  //millimeters per encoder count. from testing
     //compare old and latest encoder readings to see how much each wheel has rotated
     //speed is distance/time and should be a float in mm/sec
     float wheelTravel[NUM_ENCODERS];
@@ -148,27 +150,27 @@ float getDistanceTravelled(){
     }
     float rightTravel = minMagnitude(wheelTravel[3], wheelTravel[5], wheelTravel[5]);
     float leftTravel = minMagnitude(wheelTravel[0], wheelTravel[1], wheelTravel[1]);
-    return (leftTravel-rightTravel)/2;
+    return (leftTravel - rightTravel) / 2;
 }
 
-struct Speeds feedForward(struct Speeds targetSpeeds){
+struct Speeds feedForward(struct Speeds targetSpeeds) {
     // takes two speed commands in mm/sec
     // returns predicted motor power -100 to +100%
     //inputs and outputs both Speed structs
 
     struct Speeds commandSpeeds;
 
-    float minTurnPower = 18;  //determined from practical testing
-    float minForwardPower = 8;  //same
+    float minTurnPower = 18;       //determined from practical testing
+    float minForwardPower = 8;     //same
     float powerCoefficient = 113;  //same
-    float turnThreshold = 100;  //units: mm/sec. arbitary, value.
+    float turnThreshold = 100;     //units: mm/sec. arbitary, value.
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
     // the two would be better?
 
-   // since there's a min power needed to move (as defined above)
-   // first check if we're trying to move
+    // since there's a min power needed to move (as defined above)
+    // first check if we're trying to move
     if (targetSpeeds.left != 0 and targetSpeeds.right != 0) {
         //then check if we're trying to turn or not, i.e. left and right speeds different
         if (abs(targetSpeeds.right - targetSpeeds.left) > turnThreshold) {
@@ -190,8 +192,8 @@ struct Speeds feedForward(struct Speeds targetSpeeds){
     return commandSpeeds;
 }
 
-struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
-   // apply PID
+struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
+    // apply PID
     // takes two speed commands in -100 to +100 and two
     // target speeds in mm/sec
     // uses sensor feedback to correct for errors
@@ -204,7 +206,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
 
     float loopTime = (millis() - lastLoopTime) / 1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
-    float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
+    float travelPerEncoderCount = 1;  //millimeters per encoder count. from testing
 
     //work out target turn rate
     float targetTurnRate = (targetSpeeds.left - targetSpeeds.right) / trackWidth;
@@ -249,14 +251,15 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     commandSpeeds.right += steeringCorrection;
 
     //constrain output
-    float max_power=65;
-    commandSpeeds.left =max(min(commandSpeeds.left, max_power), -max_power);
-    commandSpeeds.right =-max(min(commandSpeeds.right, max_power), -max_power);
+    float max_power = 65;
+    commandSpeeds.left = max(min(commandSpeeds.left, max_power), -max_power);
+    commandSpeeds.right = -max(min(commandSpeeds.right, max_power), -max_power);
 
     return commandSpeeds;
 }
 
-void haltAndCatchFire() {
+void
+haltAndCatchFire() {
     while (1) {
     }
 }
@@ -270,7 +273,7 @@ void do_i2c_scan() {
         if (!twi_writeTo(addr, &data, 0, 1, 1)) {
             //C++20 has a contains() method for unordered_map
             // but find() is only one available to us?
-            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()){
+            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()) {
                 display.println(I2C_ADDRESS_NAMES.at(addr));
             } else {
                 display.print("0x");
@@ -308,16 +311,16 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 
     //get predicted motor powers from feedforward
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
-    
+
     // check if the command speed has been close to zero for a while
-    averageSpeed = 0.7 * averageSpeed + 0.3 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right)); 
+    averageSpeed = 0.7 * averageSpeed + 0.3 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
 
     //if its been zero for a while, just stop, else work out the PID modified speeds
     if (averageSpeed < minSpeed) {
-      commandMotorSpeeds = deadStop;
+        commandMotorSpeeds = deadStop;
     } else {
-      //apply PID to motor powers based on deviation from target speed
-      commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
+        //apply PID to motor powers based on deviation from target speed
+        commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
     }
 
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
@@ -341,7 +344,7 @@ void processMessage(SerialTransfer &transfer) {
     }
 }
 
-void post(){
+void post() {
     // do i2c scan
     do_i2c_scan();
 
@@ -470,7 +473,7 @@ void post(){
         delay(1000);
 
         display.clearDisplay();
-        display.setCursor(0,0);
+        display.setCursor(0, 0);
         display.println("Move robot now to check calibration");
         display.display();
         delay(5000);
@@ -513,7 +516,7 @@ void post(){
         adafruit_bno055_offsets_t newCalib;
         bno.getSensorOffsets(newCalib);
         display.clearDisplay();
-        display.setCursor(0,0);
+        display.setCursor(0, 0);
 
         display.println("Storing calibration data to EEPROM...");
 
@@ -532,7 +535,7 @@ void post(){
     }
 
     display.clearDisplay();
-    display.setCursor(0,0);
+    display.setCursor(0, 0);
     display.println("Running");
     display.display();
     currentPosition.heading = currentPosition.x = currentPosition.y = 0;
@@ -580,7 +583,7 @@ void setup() {
     delay(2000);
     int buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
     bool enterPost = false;
-    if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold){
+    if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold) {
         enterPost = true;
         display.println("Entering POST...");
         display.display();
@@ -675,7 +678,6 @@ void setup() {
 }
 
 void loop() {
-
     // Is there an incoming message available?
     if (myTransfer.available()) {
         processMessage(myTransfer);
@@ -707,14 +709,12 @@ void loop() {
 
     display.invertDisplay(shouldInvertDisplay);
 
-
     // If we have missed 10 valid motor messages
     // or the battery is going flat
     // set motors to dead stop
     if ((missedMotorMessageCount >= 10) || (batteryVoltage() < minBatVoltage)) {
         setMotorSpeeds(deadStop, motorLeft, motorRight);
     }
-
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
