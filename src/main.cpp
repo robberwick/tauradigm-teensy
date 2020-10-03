@@ -314,7 +314,20 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
         //apply PID to motor powers based on deviation from target speed
         commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
     }
-
+    
+    display.println(" ");
+    display.printf("requested L:%3.0f", requestedMotorSpeeds.left);
+    display.println(" ");
+    display.printf("requested R:%3.0f", requestedMotorSpeeds.right);
+    display.println(" ");
+    display.printf("target L:%3.0f", targetMotorSpeeds.left);
+    display.println(" ");
+    display.printf("target R:%3.0f", targetMotorSpeeds.right);
+    display.println(" ");
+    display.printf("command L:%2.2f", commandMotorSpeeds.left);
+    display.println(" ");
+    display.printf("command R:%2.2f", commandMotorSpeeds.right);
+    display.display();
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
