@@ -160,10 +160,10 @@ struct Speeds feedForward(struct Speeds targetSpeeds){
 
     struct Speeds commandSpeeds;
 
-    float minTurnPower = 18;  //determined from practical testing
-    float minForwardPower = 8;  //same
-    float powerCoefficient = 113;  //same
-    float turnThreshold = 100;  //units: mm/sec. arbitary, value.
+    float minTurnPower = 7;  //determined from practical testing
+    float minForwardPower = 18;  //same
+    float powerCoefficient = 45;  //same
+    float turnThreshold = 250;  //units: mm/sec. arbitary, value.
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
@@ -248,7 +248,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     display.printf("heading: %2.2f", orientationReading.x);
     display.display();
     commandSpeeds.left += steeringCorrection;
-    commandSpeeds.right += steeringCorrection;
+    commandSpeeds.right -= steeringCorrection;
 
     //constrain output
     float max_power=65;
@@ -323,7 +323,20 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
       //apply PID to motor powers based on deviation from target speed
       //commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
     }
-
+    
+    display.println(" ");
+    display.printf("requested L:%3.0f", requestedMotorSpeeds.left);
+    display.println(" ");
+    display.printf("requested R:%3.0f", requestedMotorSpeeds.right);
+    display.println(" ");
+    display.printf("target L:%3.0f", targetMotorSpeeds.left);
+    display.println(" ");
+    display.printf("target R:%3.0f", targetMotorSpeeds.right);
+    display.println(" ");
+    display.printf("command L:%2.2f", commandMotorSpeeds.left);
+    display.println(" ");
+    display.printf("command R:%2.2f", commandMotorSpeeds.right);
+    display.display();
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
