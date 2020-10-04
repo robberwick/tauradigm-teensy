@@ -206,7 +206,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
 
     float loopTime = (millis() - lastLoopTime) / 1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
-    float travelPerEncoderCount = 1;           //millimeters per encoder count. from testing
+    float travelPerEncoderCount = 0.4;           //millimeters per encoder count. from testing
 
     //work out target turn rate
     float targetTurnRate = (targetSpeeds.left - targetSpeeds.right) / trackWidth;
@@ -225,19 +225,29 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     //#2 is middle left    #5 is rear right
     Speeds actualMotorSpeeds;
 
-    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
-    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
+    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[4], motorSpeeds[5]);
+    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[2]);
 
     //work out actual turn rate
     float actualTurnRate = wrapTwoPi(orientationReading.x - oldOrientationReading.x) / loopTime;
 
+    display.println(" ");
+    display.printf("P in L:%3.0f,  A R:%3.0f", commandSpeeds.left, commandSpeeds.right);
     // do actual Proportional calc.
     //speed error is target - actual.
-    float fwdKp = 0.03;  //ie. how much power to use for a given speed error
+    float fwdKp = 0.02;  //ie. how much power to use for a given speed error
+    //apply P correction. right encoder reads negative when going forwards.
+    // right motor power inverted when eventually sent, so here we just need to apply more (+) power if slow
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
-    commandSpeeds.right += fwdKp * (targetSpeeds.right - actualMotorSpeeds.right);
-    float turnKp = 15;
+    commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
+    float turnKp = 2;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
+    display.println(" ");
+    display.printf("t L:%3.0f,   t R:%3.0f", targetSpeeds.left, targetSpeeds.right);
+    display.println(" ");
+    display.printf("t L:%3.0f,   a R:%3.0f", actualMotorSpeeds.left, actualMotorSpeeds.right);
+    display.println(" ");
+    display.printf("P outL:%3.0f, A R:%3.0f", commandSpeeds.left, commandSpeeds.right);
     //display.println(" ");
     //display.printf("target rate:%2.2f", targetTurnRate);
     //display.println(" ");
@@ -246,14 +256,14 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     //display.printf("steering correction: %2.2f", steeringCorrection);
     //display.println(" ");
     //display.printf("heading: %2.2f", orientationReading.x);
-    //display.display();
+    display.display();
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right -= steeringCorrection;
 
     //constrain output
     float max_power=65;
     commandSpeeds.left =max(min(commandSpeeds.left, max_power), -max_power);
-    commandSpeeds.right =-max(min(commandSpeeds.right, max_power), -max_power);
+    commandSpeeds.right =max(min(commandSpeeds.right, max_power), -max_power);
 
     return commandSpeeds;
 }
@@ -321,7 +331,7 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
       commandMotorSpeeds = deadStop;
     } else {
       //apply PID to motor powers based on deviation from target speed
-      //commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
+      commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
     }
     
     //display.println(" ");
