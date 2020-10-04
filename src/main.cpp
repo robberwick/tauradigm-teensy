@@ -171,10 +171,17 @@ struct Speeds feedForward(struct Speeds targetSpeeds) {
 
     struct Speeds commandSpeeds;
 
+<<<<<<< HEAD
     float minTurnPower = 4;       //determined from practical testing
     float minForwardPower = 5;     //same
     float powerCoefficient = 50;  //same
     float turnThreshold = 100;     //units: mm/sec. arbitary, value.
+=======
+    float minTurnPower = 4;  //determined from practical testing
+    float minForwardPower = 5;  //same
+    float powerCoefficient = 45;  //same
+    float turnThreshold = 500;  //units: mm/sec. arbitary, value.
+>>>>>>> dbee8f5... some feedforward tuning, drives much better now
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
@@ -238,6 +245,18 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
     float turnKp = 2;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
+<<<<<<< HEAD
+=======
+    //display.println(" ");
+    //display.printf("target rate:%2.2f", targetTurnRate);
+    //display.println(" ");
+    //display.printf("actual rate:%2.2f", actualTurnRate);
+    //display.println(" ");
+    //display.printf("steering correction: %2.2f", steeringCorrection);
+    //display.println(" ");
+    //display.printf("heading: %2.2f", orientationReading.x);
+    //display.display();
+>>>>>>> dbee8f5... some feedforward tuning, drives much better now
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right -= steeringCorrection;
 
@@ -291,7 +310,11 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     // for autonomous control we could revert back to using full scale
     // but for manual control, and for testing speedcontrol precision
     // better to start with limiting to lower speeds
+<<<<<<< HEAD
     float maxspeed_mm_per_sec = 1000;  //max acheivable is ~3200
+=======
+    float maxspeed_mm_per_sec = 1500;  //max acheivable is 8000
+>>>>>>> dbee8f5... some feedforward tuning, drives much better now
     targetMotorSpeeds.right = requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
@@ -315,19 +338,19 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
         commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
     }
     
-    display.println(" ");
-    display.printf("requested L:%3.0f", requestedMotorSpeeds.left);
-    display.println(" ");
-    display.printf("requested R:%3.0f", requestedMotorSpeeds.right);
-    display.println(" ");
-    display.printf("target L:%3.0f", targetMotorSpeeds.left);
-    display.println(" ");
-    display.printf("target R:%3.0f", targetMotorSpeeds.right);
-    display.println(" ");
-    display.printf("command L:%2.2f", commandMotorSpeeds.left);
-    display.println(" ");
-    display.printf("command R:%2.2f", commandMotorSpeeds.right);
-    display.display();
+    //display.println(" ");
+    //display.printf("requested L:%3.0f", requestedMotorSpeeds.left);
+    //display.println(" ");
+    //display.printf("requested R:%3.0f", requestedMotorSpeeds.right);
+    //display.println(" ");
+    //display.printf("target L:%3.0f", targetMotorSpeeds.left);
+    //display.println(" ");
+    //display.printf("target R:%3.0f", targetMotorSpeeds.right);
+    //display.println(" ");
+    //display.printf("command L:%2.2f", commandMotorSpeeds.left);
+    //display.println(" ");
+    //display.printf("command R:%2.2f", commandMotorSpeeds.right);
+    //display.display();
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
