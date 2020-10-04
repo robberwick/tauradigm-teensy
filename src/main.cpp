@@ -171,17 +171,10 @@ struct Speeds feedForward(struct Speeds targetSpeeds) {
 
     struct Speeds commandSpeeds;
 
-<<<<<<< HEAD
     float minTurnPower = 4;       //determined from practical testing
     float minForwardPower = 5;     //same
     float powerCoefficient = 50;  //same
     float turnThreshold = 100;     //units: mm/sec. arbitary, value.
-=======
-    float minTurnPower = 4;  //determined from practical testing
-    float minForwardPower = 5;  //same
-    float powerCoefficient = 45;  //same
-    float turnThreshold = 500;  //units: mm/sec. arbitary, value.
->>>>>>> dbee8f5... some feedforward tuning, drives much better now
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
@@ -238,6 +231,8 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     //work out actual turn rate
     float actualTurnRate = wrapTwoPi(orientationReading.x - oldOrientationReading.x) / loopTime;
 
+    display.println(" ");
+    display.printf("P in L:%3.0f,  A R:%3.0f", commandSpeeds.left, commandSpeeds.right);
     // do actual Proportional calc.
     //speed error is target - actual.
     float fwdKp = 0.01;  //ie. how much power to use for a given speed error
@@ -245,18 +240,6 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
     float turnKp = 2;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
-<<<<<<< HEAD
-=======
-    //display.println(" ");
-    //display.printf("target rate:%2.2f", targetTurnRate);
-    //display.println(" ");
-    //display.printf("actual rate:%2.2f", actualTurnRate);
-    //display.println(" ");
-    //display.printf("steering correction: %2.2f", steeringCorrection);
-    //display.println(" ");
-    //display.printf("heading: %2.2f", orientationReading.x);
-    //display.display();
->>>>>>> dbee8f5... some feedforward tuning, drives much better now
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right -= steeringCorrection;
 
@@ -310,11 +293,7 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     // for autonomous control we could revert back to using full scale
     // but for manual control, and for testing speedcontrol precision
     // better to start with limiting to lower speeds
-<<<<<<< HEAD
     float maxspeed_mm_per_sec = 1000;  //max acheivable is ~3200
-=======
-    float maxspeed_mm_per_sec = 1500;  //max acheivable is 8000
->>>>>>> dbee8f5... some feedforward tuning, drives much better now
     targetMotorSpeeds.right = requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
