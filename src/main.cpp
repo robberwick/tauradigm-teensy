@@ -333,30 +333,28 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
 
-void processMessage(SerialTransfer &transfer) {
+void processIncomingMessage(SerialTransfer &transfer) {
     // use this variable to keep track of how many
     // bytes we've processed from the receive buffer
-    uint16_t recSize = 0;
+    uint16_t messageSize = 0;
 
-    // Get message type, indicated by the first byte of the message
-    uint8_t messageType ;
-    recSize = myTransfer.rxObj(messageType, recSize);
-    switch (messageType) {
+    // Use packetId to determine the message type and handle accordingly
+    switch (transfer.currentPacketID()) {
         // 0 - motor speed message
         case MessageTypes::MOTOR_COMMAND:
         default:
             Speeds requestedMotorSpeeds;
-            transfer.rxObj(requestedMotorSpeeds, recSize);
+            messageSize = transfer.rxObj(requestedMotorSpeeds, messageSize);
             setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
-            // reset the missed motor mdessage count
+            // reset the missed motor message count
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessage.restart();
             break;
 
         case MessageTypes::SYSTEM_STATUS_REQUEST:
-            uint16_t payloadSize = 0;
-            transfer.txObj(systemDataMessage, sizeof(systemDataMessage), payloadSize);
+            messageSize = transfer.txObj(systemDataMessage, sizeof(systemDataMessage));
+            transfer.sendData(messageSize);
     }
 }
 
@@ -697,11 +695,11 @@ void loop() {
 
     // Is there an incoming message available?
     if (myTransfer.available()) {
-        processMessage(myTransfer);
+        processIncomingMessage(myTransfer);
     }
 
-    // if the message sending timeout has passed then increment the missed count
-    // and reset
+    // if the message receiving timeout has passed then increment
+    // the missed count and reset
     if (receiveMessage.hasPassed(20)) {
         incrementMissedMotorCount();
         receiveMessage.restart();
@@ -790,6 +788,6 @@ void loop() {
         payloadSize = myTransfer.txObj(lightSensors, payloadSize);
 
         // Send data
-        myTransfer.sendData(payloadSize);
+        myTransfer.sendData(payloadSize, MessageTypes::SENSOR_DATA);
     }
 }
