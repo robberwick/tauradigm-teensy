@@ -236,15 +236,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     commandSpeeds.right += fwdKp * (targetSpeeds.right - actualMotorSpeeds.right);
     float turnKp = 15;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
-    display.println(" ");
-    display.printf("target rate:%2.2f", targetTurnRate);
-    display.println(" ");
-    display.printf("actual rate:%2.2f", actualTurnRate);
-    display.println(" ");
-    display.printf("steering correction: %2.2f", steeringCorrection);
-    display.println(" ");
-    display.printf("heading: %2.2f", orientationReading.x);
-    display.display();
+
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right += steeringCorrection;
 
@@ -680,6 +672,13 @@ void setup() {
 }
 
 void loop() {
+    long tofTimes[8] = {};
+    long encoderTimes[NUM_ENCODERS] = {};
+    long imuTime = 0;
+    long lightTimes[4] = {};
+    long loopStartTime = millis();
+    long startTime = 0;
+    long loopEndTime = 0;
 
     // Is there an incoming message available?
     if (myTransfer.available()) {
@@ -723,14 +722,17 @@ void loop() {
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
+
         // Iterate through ToF sensors and attempt to get reading
         for (uint8_t t = 0; t < 8; t++) {
             tcaselect(t);
             if (activeToFSensors[t]) {
+                startTime = millis();
                 distances[t] = sensor.readRangeContinuousMillimeters();
                 if (sensor.timeoutOccurred()) {
                     distances[t] = 0;
                 }
+                tofTimes[t] = millis() - startTime;
             } else {
                 distances[t] = 0;
             }
@@ -738,21 +740,28 @@ void loop() {
 
         /// Read Encoder counts
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+            startTime = millis();
             oldEncoderReadings[n] = encoderReadings[n];
             encoderReadings[n] = encoders[n].read();
+            tofTimes[n] = millis() - startTime;
         }
 
         // Read IMU
         sensors_event_t orientationData;
         bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
+        startTime = millis();
         oldOrientationReading = orientationReading;
         orientationReading.x = radians(orientationData.orientation.x);
         orientationReading.y = radians(orientationData.orientation.y);
         orientationReading.z = radians(orientationData.orientation.z);
+        imuTime = millis() - startTime;
 
         for (u_int8_t n = 0; n < 4; n++) {
+            startTime = millis();
             lightSensors[n] = ads1115.readADC_SingleEnded(n);
+            lightTimes[n] = millis() - startTime;
         }
+
         uint16_t payloadSize = 0;
 
         //update odometry
@@ -778,4 +787,22 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
+    loopEndTime = millis();
+
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.printf("%d %d %d %d", tofTimes[0], tofTimes[1], tofTimes[2], tofTimes[3]);
+    display.println("");
+    display.printf("%d %d %d %d", tofTimes[4], tofTimes[5], tofTimes[6], tofTimes[7]);
+    display.println("");
+    display.printf("%d %d %d", encoderTimes[0], encoderTimes[1], encoderTimes[2]);
+    display.println("");
+    display.printf("%d %d %d", encoderTimes[3], encoderTimes[4], encoderTimes[5]);
+    display.println("");
+    display.printf("%d", imuTime);
+    display.println("");
+    display.printf("%d %d %d %d", lightTimes[0], lightTimes[1], lightTimes[2], lightTimes[3]);
+    display.println("");
+    display.printf("%d", loopEndTime - loopStartTime);
+    display.display();
 }
