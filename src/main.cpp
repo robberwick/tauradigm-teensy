@@ -676,7 +676,7 @@ void loop() {
     long encoderTimes[NUM_ENCODERS] = {};
     long imuTime = 0;
     long lightTimes[4] = {};
-    long loopStartTime = millis();
+    long loopStartTime = micros();
     long startTime = 0;
     long loopEndTime = 0;
 
@@ -727,12 +727,12 @@ void loop() {
         for (uint8_t t = 0; t < 8; t++) {
             tcaselect(t);
             if (activeToFSensors[t]) {
-                startTime = millis();
+                startTime = micros();
                 distances[t] = sensor.readRangeContinuousMillimeters();
                 if (sensor.timeoutOccurred()) {
                     distances[t] = 0;
                 }
-                tofTimes[t] = millis() - startTime;
+                tofTimes[t] = micros() - startTime;
             } else {
                 distances[t] = 0;
             }
@@ -740,26 +740,26 @@ void loop() {
 
         /// Read Encoder counts
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-            startTime = millis();
+            startTime = micros();
             oldEncoderReadings[n] = encoderReadings[n];
             encoderReadings[n] = encoders[n].read();
-            tofTimes[n] = millis() - startTime;
+            tofTimes[n] = micros() - startTime;
         }
 
         // Read IMU
         sensors_event_t orientationData;
         bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
-        startTime = millis();
+        startTime = micros();
         oldOrientationReading = orientationReading;
         orientationReading.x = radians(orientationData.orientation.x);
         orientationReading.y = radians(orientationData.orientation.y);
         orientationReading.z = radians(orientationData.orientation.z);
-        imuTime = millis() - startTime;
+        imuTime = micros() - startTime;
 
         for (u_int8_t n = 0; n < 4; n++) {
-            startTime = millis();
-            lightSensors[n] = ads1115.readADC_SingleEnded(n);
-            lightTimes[n] = millis() - startTime;
+            startTime = micros();
+            lightSensors[n] = 0; //ads1115.readADC_SingleEnded(n);
+            lightTimes[n] = micros() - startTime;
         }
 
         uint16_t payloadSize = 0;
@@ -787,7 +787,7 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
-    loopEndTime = millis();
+    loopEndTime = micros();
 
     display.clearDisplay();
     display.setCursor(0, 0);
