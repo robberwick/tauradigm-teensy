@@ -320,7 +320,7 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 
     //get predicted motor powers from feedforward
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
-    
+
     // check if the command speed has been close to zero for a while
     // if it is, we're probably are stopped and want to be stopped
     averageSpeed = 0.7 * averageSpeed + 0.3 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right)); 
@@ -352,15 +352,22 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 }
 
 void processMessage(SerialTransfer &transfer) {
+    // use this variable to keep track of how many
+    // bytes we've processed from the receive buffer
+    uint16_t recSize = 0;
+
     // Get message type, indicated by the first byte of the message
-    uint8_t messageType = transfer.rxBuff[0];
+    uint8_t messageType ;
+    recSize = myTransfer.rxObj(messageType, recSize);
     switch (messageType) {
         // 0 - motor speed message
         case 1:
             Speeds requestedMotorSpeeds;
-            float messages[4];
-            transfer.rxObj(messages, sizeof(messages), sizeof(messageType));
-            requestedMotorSpeeds = {messages[0], messages[1]};
+
+//            float messages[4];
+//            transfer.rxObj(messages, sizeof(messages), sizeof(messageType));
+//            requestedMotorSpeeds = {messages[0], messages[1]};
+            transfer.rxObj(requestedMotorSpeeds, recSize);
             setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
             // reset the missed motor mdessage count
             resetMissedMotorCount();
@@ -534,7 +541,7 @@ void post(){
 
         display.clearDisplay();
         display.setCursor(0,0);
-        display.println("Move robot now to cehck calibration");
+        display.println("Move robot now to check calibration");
         display.display();
         delay(5000);
         uint8_t system, gyro, accel, mag;
@@ -625,6 +632,14 @@ void setup() {
     delay(3000);
 
     pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
+    display.clearDisplay();
+    display.setCursor(0, 10);
+    display.println("Git Branch:");
+    display.println(GIT_BRANCH);
+    display.println("Git commit hash:");
+    display.println(GIT_REV);
+    display.display();
+    delay(2000);
     display.clearDisplay();
     display.setCursor(0, 10);
     display.println("Press button now to  enter POST");
@@ -813,24 +828,19 @@ void loop() {
         currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
 
         // Prepare the distance data
-        myTransfer.txObj(distances, sizeof(distances), payloadSize);
-        payloadSize += sizeof(distances);
+        payloadSize = myTransfer.txObj(distances, payloadSize);
 
         //Prepare encoder data
-        myTransfer.txObj(encoderReadings, sizeof(encoderReadings), payloadSize);
-        payloadSize += sizeof(encoderReadings);
+        payloadSize = myTransfer.txObj(encoderReadings, payloadSize);
 
         //Prepare IMU data
-        myTransfer.txObj(orientationReading, sizeof(orientationReading), payloadSize);
-        payloadSize += sizeof(orientationReading);
+        payloadSize = myTransfer.txObj(orientationReading, payloadSize);
 
         //Prepare odometry data
-        myTransfer.txObj(currentPosition, sizeof(currentPosition), payloadSize);
-        payloadSize += sizeof(currentPosition);
+        payloadSize = myTransfer.txObj(currentPosition, payloadSize);
 
         //Prepare ADC data
-        myTransfer.txObj(lightSensors, sizeof(lightSensors), payloadSize);
-        payloadSize += sizeof(lightSensors);
+        payloadSize = myTransfer.txObj(lightSensors, payloadSize);
 
         // Send data
         myTransfer.sendData(payloadSize);
