@@ -545,7 +545,7 @@ void post(){
 
 void setup() {
     // Initialise I2C bus
-    Wire.begin();
+    Wire.begin(TEENSY_PIN_I2C_SDA, TEENSY_PIN_I2C_SCL);
 
     // Initalise display and show logo
     if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
@@ -580,7 +580,8 @@ void setup() {
     display.println("Press button now to  enter POST");
     display.println();
     display.println("Battery Voltage:");
-    display.printf("%2.2f V", batteryVoltage());
+    float batVoltage = batteryVoltage();
+    display.printf("%2.2f V", batVoltage );
     display.display();
     delay(2000);
     int buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
