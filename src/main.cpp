@@ -818,7 +818,7 @@ void loop() {
         orientationReading.z = radians(orientationData.orientation.z);
 
         for (u_int8_t n = 0; n < 4; n++) {
-            lightSensors[n] = ads1115.readADC_SingleEnded(n);
+            lightSensors[n] = 0; //ads1115.readADC_SingleEnded(n);
         }
         uint16_t payloadSize = 0;
 
