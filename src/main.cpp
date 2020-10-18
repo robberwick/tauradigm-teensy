@@ -37,7 +37,7 @@ struct Speeds {
     float right;
 };
 float averageSpeed;
-float minSpeed = 0.01;
+float minSpeed = 0.0001;
 
 Speeds deadStop = {0, 0};
 
@@ -240,7 +240,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     // right motor power inverted when eventually sent, so here we just need to apply more (+) power if slow
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
     commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
-    float turnKp = 2;
+    float turnKp = 0;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
     display.println(" ");
     display.printf("t L:%3.0f,   t R:%3.0f", targetSpeeds.left, targetSpeeds.right);
@@ -363,7 +363,6 @@ void processMessage(SerialTransfer &transfer) {
         // 0 - motor speed message
         case 1:
             Speeds requestedMotorSpeeds;
-
 //            float messages[4];
 //            transfer.rxObj(messages, sizeof(messages), sizeof(messageType));
 //            requestedMotorSpeeds = {messages[0], messages[1]};
@@ -373,6 +372,8 @@ void processMessage(SerialTransfer &transfer) {
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessage.restart();
+            display.printf("requested motor speeds: %2.2f, %2.2f",requestedMotorSpeeds.left,requestedMotorSpeeds.right);
+            display.display();
             break;
         case 2:
             char button;
@@ -382,25 +383,21 @@ void processMessage(SerialTransfer &transfer) {
                     esc_1.writeMicroseconds(900);
                     display.println(F("jaw closing"));
                     display.display();
-                    delay(200);
                     break;
                 case 'x':
                     esc_2.writeMicroseconds(1300);
                     display.println(F("jaw down"));
                     display.display();
-                    delay(200);
                     break;
                 case 's':
                     esc_1.writeMicroseconds(1600);
                     display.println(F("jaw opening"));
                     display.display();
-                    delay(200);
                     break;
                 case 't':
                     esc_2.writeMicroseconds(2100);
                     display.println(F("jaw up"));
                     display.display();
-                    delay(200);
                     break;
             }
             break;
