@@ -37,7 +37,7 @@ struct Speeds {
     float right;
 };
 float averageSpeed;
-float minSpeed = 0.01;
+float minSpeed = 20;
 
 Speeds deadStop = {0, 0};
 
@@ -160,9 +160,9 @@ struct Speeds feedForward(struct Speeds targetSpeeds) {
 
     struct Speeds commandSpeeds;
 
-    float minTurnPower = 18;       //determined from practical testing
-    float minForwardPower = 8;     //same
-    float powerCoefficient = 113;  //same
+    float minTurnPower = 4;       //determined from practical testing
+    float minForwardPower = 5;     //same
+    float powerCoefficient = 50;  //same
     float turnThreshold = 100;     //units: mm/sec. arbitary, value.
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
@@ -181,8 +181,8 @@ struct Speeds feedForward(struct Speeds targetSpeeds) {
             commandSpeeds.left = -turnComponent + forwardComponent;
         } else {
             //a different formula is best fit for going straight
-            commandSpeeds.right = sgn(targetSpeeds.right) * abs(targetSpeeds.right) / powerCoefficient + minForwardPower;
-            commandSpeeds.left = sgn(targetSpeeds.left) * abs(targetSpeeds.left) / powerCoefficient + minForwardPower;
+            commandSpeeds.right = sgn(targetSpeeds.right) * (abs(targetSpeeds.right) / powerCoefficient + minForwardPower);
+            commandSpeeds.left = sgn(targetSpeeds.left) * (abs(targetSpeeds.left) / powerCoefficient + minForwardPower);
         }
     } else {
         //if we're not trying to move, turn the motors off
@@ -206,7 +206,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
 
     float loopTime = (millis() - lastLoopTime) / 1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
-    float travelPerEncoderCount = 1;  //millimeters per encoder count. from testing
+    float travelPerEncoderCount = 0.4;  //millimeters per encoder count. from testing
 
     //work out target turn rate
     float targetTurnRate = (targetSpeeds.left - targetSpeeds.right) / trackWidth;
@@ -225,18 +225,18 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     //#2 is middle left    #5 is rear right
     Speeds actualMotorSpeeds;
 
-    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
-    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
+    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[4], motorSpeeds[5]);
+    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[2]);
 
     //work out actual turn rate
     float actualTurnRate = wrapTwoPi(orientationReading.x - oldOrientationReading.x) / loopTime;
 
     // do actual Proportional calc.
     //speed error is target - actual.
-    float fwdKp = 0.03;  //ie. how much power to use for a given speed error
+    float fwdKp = 0.01;  //ie. how much power to use for a given speed error
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
-    commandSpeeds.right += fwdKp * (targetSpeeds.right - actualMotorSpeeds.right);
-    float turnKp = 15;
+    commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
+    float turnKp = 2;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
     display.println(" ");
     display.printf("target rate:%2.2f", targetTurnRate);
@@ -248,12 +248,12 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     display.printf("heading: %2.2f", orientationReading.x);
     display.display();
     commandSpeeds.left += steeringCorrection;
-    commandSpeeds.right += steeringCorrection;
+    commandSpeeds.right -= steeringCorrection;
 
     //constrain output
     float max_power = 65;
     commandSpeeds.left = max(min(commandSpeeds.left, max_power), -max_power);
-    commandSpeeds.right = -max(min(commandSpeeds.right, max_power), -max_power);
+    commandSpeeds.right = max(min(commandSpeeds.right, max_power), -max_power);
 
     return commandSpeeds;
 }
@@ -300,7 +300,7 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     // for autonomous control we could revert back to using full scale
     // but for manual control, and for testing speedcontrol precision
     // better to start with limiting to lower speeds
-    float maxspeed_mm_per_sec = 3000;  //max acheivable is 8000
+    float maxspeed_mm_per_sec = 1000;  //max acheivable is 8000
     targetMotorSpeeds.right = requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
@@ -313,7 +313,7 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
 
     // check if the command speed has been close to zero for a while
-    averageSpeed = 0.7 * averageSpeed + 0.3 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
+    averageSpeed = 0.5 * averageSpeed + 0.5 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
 
     //if its been zero for a while, just stop, else work out the PID modified speeds
     if (averageSpeed < minSpeed) {
@@ -756,7 +756,7 @@ void loop() {
         orientationReading.z = radians(orientationData.orientation.z);
 
         for (u_int8_t n = 0; n < 4; n++) {
-            lightSensors[n] = ads1115.readADC_SingleEnded(n);
+            lightSensors[n] = 0; //ads1115.readADC_SingleEnded(n);
         }
         uint16_t payloadSize = 0;
 
