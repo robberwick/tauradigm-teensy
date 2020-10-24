@@ -47,6 +47,7 @@ uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
 float trackWidth = 136;
+float travelPerEncoderCount = 1.0;  //millimeters per encoder count. from testing
 
 SerialTransfer myTransfer;
 
@@ -141,7 +142,6 @@ float batteryVoltage() {
 
 float getDistanceTravelled() {
     // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct
-    float travelPerEncoderCount = 1.0;  //millimeters per encoder count. from testing
     //compare old and latest encoder readings to see how much each wheel has rotated
     //speed is distance/time and should be a float in mm/sec
     float wheelTravel[NUM_ENCODERS];
@@ -206,7 +206,6 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
 
     float loopTime = (millis() - lastLoopTime) / 1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
-    float travelPerEncoderCount = 1;  //millimeters per encoder count. from testing
 
     //work out target turn rate
     float targetTurnRate = (targetSpeeds.left - targetSpeeds.right) / trackWidth;
