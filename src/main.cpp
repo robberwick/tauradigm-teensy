@@ -47,7 +47,7 @@ uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
 float trackWidth = 136;
-float travelPerEncoderCount = 1.0;  //millimeters per encoder count. from testing
+float travelPerEncoderCount = 0.262;  //millimeters per encoder count. from testing
 
 SerialTransfer myTransfer;
 
