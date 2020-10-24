@@ -37,7 +37,7 @@ struct Speeds {
     float right;
 };
 float averageSpeed;
-float minSpeed = 0.0001;
+float minSpeed = 20;
 
 Speeds deadStop = {0, 0};
 
@@ -162,8 +162,8 @@ struct Speeds feedForward(struct Speeds targetSpeeds){
 
     float minTurnPower = 4;  //determined from practical testing
     float minForwardPower = 5;  //same
-    float powerCoefficient = 45;  //same
-    float turnThreshold = 500;  //units: mm/sec. arbitary, value.
+    float powerCoefficient = 50;  //same
+    float turnThreshold = 100;  //units: mm/sec. arbitary, value.
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
@@ -181,8 +181,8 @@ struct Speeds feedForward(struct Speeds targetSpeeds){
             commandSpeeds.left = -turnComponent + forwardComponent;
         } else {
             //a different formula is best fit for going straight
-            commandSpeeds.right = sgn(targetSpeeds.right) * abs(targetSpeeds.right) / powerCoefficient + minForwardPower;
-            commandSpeeds.left = sgn(targetSpeeds.left) * abs(targetSpeeds.left) / powerCoefficient + minForwardPower;
+            commandSpeeds.right = sgn(targetSpeeds.right) * (abs(targetSpeeds.right) / powerCoefficient + minForwardPower);
+            commandSpeeds.left = sgn(targetSpeeds.left) * (abs(targetSpeeds.left) / powerCoefficient + minForwardPower);
         }
     } else {
         //if we're not trying to move, turn the motors off
@@ -231,24 +231,17 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     //work out actual turn rate
     float actualTurnRate = wrapTwoPi(orientationReading.x - oldOrientationReading.x) / loopTime;
 
-    display.println(" ");
-    display.printf("P in L:%3.0f,  A R:%3.0f", commandSpeeds.left, commandSpeeds.right);
+    //display.println(" ");
+    //display.printf("P in L:%3.0f,  A R:%3.0f", commandSpeeds.left, commandSpeeds.right);
     // do actual Proportional calc.
     //speed error is target - actual.
-    float fwdKp = 0.02;  //ie. how much power to use for a given speed error
+    float fwdKp = 0.01;  //ie. how much power to use for a given speed error
     //apply P correction. right encoder reads negative when going forwards.
     // right motor power inverted when eventually sent, so here we just need to apply more (+) power if slow
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
     commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
-    float turnKp = 0;
+    float turnKp = 2;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
-    display.println(" ");
-    display.printf("t L:%3.0f,   t R:%3.0f", targetSpeeds.left, targetSpeeds.right);
-    display.println(" ");
-    display.printf("t L:%3.0f,   a R:%3.0f", actualMotorSpeeds.left, actualMotorSpeeds.right);
-    display.println(" ");
-    display.printf("P outL:%3.0f, A R:%3.0f", commandSpeeds.left, commandSpeeds.right);
-    //display.println(" ");
     //display.printf("target rate:%2.2f", targetTurnRate);
     //display.println(" ");
     //display.printf("actual rate:%2.2f", actualTurnRate);
@@ -256,7 +249,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds){
     //display.printf("steering correction: %2.2f", steeringCorrection);
     //display.println(" ");
     //display.printf("heading: %2.2f", orientationReading.x);
-    display.display();
+    //display.display();
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right -= steeringCorrection;
 
@@ -309,7 +302,7 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     // for autonomous control we could revert back to using full scale
     // but for manual control, and for testing speedcontrol precision
     // better to start with limiting to lower speeds
-    float maxspeed_mm_per_sec = 1500;  //max acheivable is 8000
+    float maxspeed_mm_per_sec = 1000;  //max acheivable is 8000
     targetMotorSpeeds.right = requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
@@ -323,7 +316,7 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 
     // check if the command speed has been close to zero for a while
     // if it is, we're probably are stopped and want to be stopped
-    averageSpeed = 0.7 * averageSpeed + 0.3 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right)); 
+    averageSpeed = 0.5 * averageSpeed + 0.5 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right)); 
 
     //if its been zero for a while, just stop, else work out the PID modified speeds
     //not applying PID when stopped, stops the motors going crazy if the robot is carried
@@ -372,8 +365,6 @@ void processMessage(SerialTransfer &transfer) {
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessage.restart();
-            display.printf("requested motor speeds: %2.2f, %2.2f",requestedMotorSpeeds.left,requestedMotorSpeeds.right);
-            display.display();
             break;
         case 2:
             char button;
@@ -383,21 +374,25 @@ void processMessage(SerialTransfer &transfer) {
                     esc_1.writeMicroseconds(900);
                     display.println(F("jaw closing"));
                     display.display();
+                    delay(200);
                     break;
                 case 'x':
                     esc_2.writeMicroseconds(1300);
                     display.println(F("jaw down"));
                     display.display();
+                    delay(200);
                     break;
                 case 's':
                     esc_1.writeMicroseconds(1600);
                     display.println(F("jaw opening"));
                     display.display();
+                    delay(200);
                     break;
                 case 't':
                     esc_2.writeMicroseconds(2100);
                     display.println(F("jaw up"));
                     display.display();
+                    delay(200);
                     break;
             }
             break;
@@ -750,6 +745,10 @@ void loop() {
         processMessage(myTransfer);
     }
 
+    int messageSize=0;
+    messageSize = myTransfer.packet.bytesToRec;
+
+
     // if the message sending timeout has passed then increment the missed count
     // and reset
     if (receiveMessage.hasPassed(20)) {
@@ -762,6 +761,8 @@ void loop() {
 
     display.clearDisplay();
     display.setCursor(0, 0);
+    display.printf("mess size: %d", messageSize);
+    display.println(" ");
     if (missedMotorMessageCount >= 10) {
         shouldInvertDisplay = true;
         display.printf("missed message %d", missedMotorMessageCount);
@@ -785,7 +786,7 @@ void loop() {
     }
 
 
-    if (readSensors.hasPassed(10)) {
+    if (readSensors.hasPassed(100)) {
         readSensors.restart();
         // Iterate through ToF sensors and attempt to get reading
         for (uint8_t t = 0; t < 8; t++) {
