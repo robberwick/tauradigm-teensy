@@ -1,6 +1,6 @@
 #include <Adafruit_ADS1015.h>
 #include <Adafruit_BNO055.h>
-#include <Adafruit_SSD1306.h>
+// #include <Adafruit_SSD1306.h>
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <Chrono.h>
@@ -9,13 +9,15 @@
 #include <SerialTransfer.h>
 #include <Servo.h>
 #include <VL53L0X.h>
+#include <unordered_map>
 #include <utility/imumaths.h>
 
-#include <unordered_map>
-
 #include "Wire.h"
+
 #include "config.h"
 #include "graphics.h"
+#include "screen.h"
+#include "status.h"
 
 // #define DEBUG
 
@@ -26,16 +28,8 @@ HardwareSerial Serial2(USART2);
 Servo motorLeft;
 Servo motorRight;
 
-struct Pose {
-    float heading;
-    float x;
-    float y;
-} currentPosition, previousPosition;
+Pose currentPosition, previousPosition;
 
-struct Speeds {
-    float left;
-    float right;
-};
 float averageSpeed;
 float minSpeed = 20;
 
@@ -57,7 +51,7 @@ Chrono receiveMessage;
 Chrono readSensors;
 VL53L0X sensor;
 
-float distances[8];
+// float distances[8];
 bool activeToFSensors[8];
 int16_t lightSensors[4];
 
@@ -72,14 +66,11 @@ Encoder encoders[NUM_ENCODERS] = {
 long encoderReadings[NUM_ENCODERS];
 long oldEncoderReadings[NUM_ENCODERS];
 
-Adafruit_SSD1306 display(128, 64);
+Status robotStatus;
+Screen screen(128, 64);
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
-struct OrientationReading {
-    float x;
-    float y;
-    float z;
-} orientationReading, oldOrientationReading;
+OrientationReading orientationReading, oldOrientationReading;
 
 void tcaselect(uint8_t i) {
     if (i > 7) {
@@ -144,7 +135,7 @@ Speeds getWheelTravel() {
     //compare old and latest encoder readings to see how much each wheel has rotated
     float wheelTravel[NUM_ENCODERS];
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-        wheelTravel[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) * travelPerEncoderCount;
+        wheelTravel[n] = ((float)(robotStatus.sensors.encoders.current[n] - robotStatus.sensors.encoders.previous[n])) * travelPerEncoderCount;
     }
     //most representative speed assumed to be slowest wheel
     //#0, #1 & #3 is left,  #3, #4 & #5 is right
@@ -254,23 +245,23 @@ haltAndCatchFire() {
 }
 
 void do_i2c_scan() {
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("I2c Devices");
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 0);
+    screen.display.println("I2c Devices");
     for (uint8_t addr = 1; addr <= 127; addr++) {
         Wire.beginTransmission(addr);
         if (!Wire.endTransmission() == 0) {
             //C++20 has a contains() method for unordered_map
             // but find() is only one available to us?
             if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()) {
-                display.println(I2C_ADDRESS_NAMES.at(addr));
+                screen.display.println(I2C_ADDRESS_NAMES.at(addr));
             } else {
-                display.print("0x");
-                display.println(addr, HEX);
+                screen.display.print("0x");
+                screen.display.println(addr, HEX);
             }
         }
     }
-    display.display();
+    screen.display.display();
     delay(4000);
 }
 
@@ -343,44 +334,44 @@ void post() {
     do_i2c_scan();
 
     // Attach motors
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("Motors"));
-    display.display();
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 0);
+    screen.display.println(F("Motors"));
+    screen.display.display();
     motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
     motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
-    display.setCursor(0, 10);
-    display.print("OK");
-    display.display();
+    screen.display.setCursor(0, 10);
+    screen.display.print("OK");
+    screen.display.display();
     delay(500);
 
     // Initialise serial transfer
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("Serial transfer"));
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 0);
+    screen.display.println(F("Serial transfer"));
 
-    display.display();
-    display.print("OK");
+    screen.display.display();
+    screen.display.print("OK");
     myTransfer.begin(Serial2);
-    display.display();
+    screen.display.display();
     delay(500);
 
     // Initialise ToF sensors
     tcaselect(0);
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("ToF sensors"));
-    display.display();
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 0);
+    screen.display.println(F("ToF sensors"));
+    screen.display.display();
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
-        display.printf("initialising %d", t);
-        display.display();
+        screen.display.printf("initialising %d", t);
+        screen.display.display();
         activeToFSensors[t] = sensor.init();
-        display.setCursor(0, display.getCursorY() + 1);
-        display.printf("init %d done", t);
+        screen.display.setCursor(0, screen.display.getCursorY() + 1);
+        screen.display.printf("init %d done", t);
 
         if (activeToFSensors[t]) {
-            display.printf("%d: OK", t);
+            screen.display.printf("%d: OK", t);
             sensor.setMeasurementTimingBudget(33000);
             // lower the return signal rate limit (default is 0.25 MCPS)
             sensor.setSignalRateLimit(0.1);
@@ -393,36 +384,36 @@ void post() {
             // ms (e.g. sensor.startContinuous(100)).
             sensor.startContinuous();
         } else {
-            display.printf("%d: FAIL", t);
+            screen.display.printf("%d: FAIL", t);
         }
         if (t % 2 == 1) {
-            display.println("");
+            screen.display.println("");
         } else {
-            display.setCursor(64, display.getCursorY());
+            screen.display.setCursor(64, screen.display.getCursorY());
         }
-        display.display();
+        screen.display.display();
         delay(50);
     }
     delay(500);
-    display.clearDisplay();
-    display.display();
+    screen.display.clearDisplay();
+    screen.display.display();
 
     // //initialise IMU
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("IMU"));
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 0);
+    screen.display.println(F("IMU"));
     // Do we have an IMU
     if (!bno.begin()) {
-        display.println("FAIL");
-        display.display();
+        screen.display.println("FAIL");
+        screen.display.display();
         delay(3000);
     } else {
-        display.println("OK");
-        display.display();
+        screen.display.println("OK");
+        screen.display.display();
         delay(3000);
 
-        display.clearDisplay();
-        display.setCursor(0, 0);
+        screen.display.clearDisplay();
+        screen.display.setCursor(0, 0);
 
         // look for calibration data. if it exists, load it.
         // if not, calibrate then store the data in the EEPROM
@@ -435,68 +426,68 @@ void post() {
 
         bno.getSensor(&sensor);
         if (bnoID != sensor.sensor_id) {
-            display.println("No Calibration Data in EEPROM");
+            screen.display.println("No Calibration Data in EEPROM");
 
         } else {
-            display.println("Found Calibration in EEPROM.");
+            screen.display.println("Found Calibration in EEPROM.");
             eeAddress += sizeof(long);
             EEPROM.get(eeAddress, calibrationData);
 
-            display.println("Restoring...");
+            screen.display.println("Restoring...");
             bno.setSensorOffsets(calibrationData);
 
-            display.println("Restored");
+            screen.display.println("Restored");
         }
-        display.display();
+        screen.display.display();
         delay(1000);
 
-        display.clearDisplay();
-        display.setCursor(0, 0);
-        display.println("Move robot now to check calibration");
-        display.display();
+        screen.display.clearDisplay();
+        screen.display.setCursor(0, 0);
+        screen.display.println("Move robot now to check calibration");
+        screen.display.display();
         delay(5000);
         uint8_t system, gyro, accel, mag;
         system = gyro = accel = mag = 0;
         sensors_event_t event;
         bno.getEvent(&event);
-        display.println("Move sensor to calibrate magnetometers");
-        display.display();
-        u_int8_t curYPos = display.getCursorY();
+        screen.display.println("Move sensor to calibrate magnetometers");
+        screen.display.display();
+        u_int8_t curYPos = screen.display.getCursorY();
         while (!system) {
             bno.getCalibration(&system, &gyro, &accel, &mag);
             /* Display the individual values */
-            display.setCursor(0, curYPos);
-            display.print("Sys:");
-            display.print(system, DEC);
-            display.print(" G:");
-            display.print(gyro, DEC);
-            display.print(" A:");
-            display.print(accel, DEC);
-            display.print(" M:");
-            display.println(mag, DEC);
-            display.setCursor(0, curYPos + 10);
+            screen.display.setCursor(0, curYPos);
+            screen.display.print("Sys:");
+            screen.display.print(system, DEC);
+            screen.display.print(" G:");
+            screen.display.print(gyro, DEC);
+            screen.display.print(" A:");
+            screen.display.print(accel, DEC);
+            screen.display.print(" M:");
+            screen.display.println(mag, DEC);
+            screen.display.setCursor(0, curYPos + 10);
             /* Display the individual values */
             delay(BNO055_SAMPLERATE_DELAY_MS);
-            display.print("X:");
-            display.print(event.orientation.x, 4);
-            display.print(" Y:");
-            display.print(event.orientation.y, 4);
-            display.print(" Z:");
-            display.println(event.orientation.z, 4);
-            display.display();
+            screen.display.print("X:");
+            screen.display.print(event.orientation.x, 4);
+            screen.display.print(" Y:");
+            screen.display.print(event.orientation.y, 4);
+            screen.display.print(" Z:");
+            screen.display.println(event.orientation.z, 4);
+            screen.display.display();
             bno.getEvent(&event);
             delay(BNO055_SAMPLERATE_DELAY_MS);
         }
-        display.println("calibrated OK");
-        display.display();
+        screen.display.println("calibrated OK");
+        screen.display.display();
         delay(3000);
 
         adafruit_bno055_offsets_t newCalib;
         bno.getSensorOffsets(newCalib);
-        display.clearDisplay();
-        display.setCursor(0, 0);
+        screen.display.clearDisplay();
+        screen.display.setCursor(0, 0);
 
-        display.println("Storing calibration data to EEPROM...");
+        screen.display.println("Storing calibration data to EEPROM...");
 
         eeAddress = 0;
         bno.getSensor(&sensor);
@@ -506,16 +497,16 @@ void post() {
 
         eeAddress += sizeof(long);
         EEPROM.put(eeAddress, newCalib);
-        display.println("Data stored to EEPROM.");
-        display.display();
+        screen.display.println("Data stored to EEPROM.");
+        screen.display.display();
 
         delay(2000);
     }
 
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("Running");
-    display.display();
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 0);
+    screen.display.println("Running");
+    screen.display.display();
     currentPosition.heading = currentPosition.x = currentPosition.y = 0;
 }
 
@@ -528,61 +519,60 @@ void setup() {
 #endif
 
     // Initalise display and show logo
-    if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
+    if (!screen.display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
         // TODO show failure message on OLED
         haltAndCatchFire();
     }
-    display.setTextSize(1);                              // Normal 1:1 pixel scale
-    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
-    display.setCursor(0, 0);                             // Start at top-left corner
-    display.cp437(true);                                 // Use full 256 char 'Code Page 437' font
+    screen.display.setTextSize(1);                              // Normal 1:1 pixel scale
+    screen.display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
+    screen.display.setCursor(0, 0);                             // Start at top-left corner
+    screen.display.cp437(true);                                 // Use full 256 char 'Code Page 437' font
 
-    display.clearDisplay();
+    screen.display.clearDisplay();
 
-    display.drawBitmap(
-        (display.width() - LOGO_WIDTH) / 2,
-        (display.height() - LOGO_HEIGHT) / 2,
+    screen.display.drawBitmap(
+        (screen.display.width() - LOGO_WIDTH) / 2,
+        (screen.display.height() - LOGO_HEIGHT) / 2,
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-    display.display();
+    screen.display.display();
     delay(3000);
 
     pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
-    display.clearDisplay();
-    display.setCursor(0, 10);
-    display.println("Git Branch:");
-    display.println(GIT_BRANCH);
-    display.println("Git commit hash:");
-    display.println(GIT_REV);
-    display.display();
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 10);
+    screen.display.println("Git Branch:");
+    screen.display.println(GIT_BRANCH);
+    screen.display.println("Git commit hash:");
+    screen.display.println(GIT_REV);
+    screen.display.display();
     delay(2000);
-    display.clearDisplay();
-    display.setCursor(0, 10);
-    display.println("Press button now to  enter POST");
-    display.println();
-    display.println("Battery Voltage:");
-    float batVoltage = batteryVoltage();
-    display.printf("%2.2f V", batVoltage);
-    display.display();
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 10);
+    screen.display.println("Press button now to  enter POST");
+    screen.display.println();
+    screen.display.println("Battery Voltage:");
+    screen.display.printf("%2.2f V", batteryVoltage());
+    screen.display.display();
     delay(2000);
-    int buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
+    uint32_t buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
     bool enterPost = false;
     if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold) {
         enterPost = true;
-        display.println("Entering POST...");
-        display.display();
+        screen.display.println("Entering POST...");
+        screen.display.display();
         delay(500);
     }
 
     // Setup serial comms
     // Show debug warning if debug flag is set
 #ifdef DEBUG
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println(F("*** WARNING ***"));
-    display.println("");
-    display.println("Debug flag is set");
-    display.println("Waiting for\nUSB serial");
-    display.display();
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 0);
+    screen.display.println(F("*** WARNING ***"));
+    screen.display.println("");
+    screen.display.println("Debug flag is set");
+    screen.display.println("Waiting for\nUSB serial");
+    screen.display.display();
     delay(1000);
     Serial.begin(115200);
     while (!Serial) {
@@ -627,33 +617,33 @@ void setup() {
         }
 
         // //initialise IMU
-        display.clearDisplay();
-        display.setCursor(0, 0);
+        screen.display.clearDisplay();
+        screen.display.setCursor(0, 0);
         if (!bno.begin()) {
-            display.println("IMU FAIL");
+            screen.display.println("IMU FAIL");
         } else {
-            display.println("IMU CAL:");
+            screen.display.println("IMU CAL:");
         }
         uint8_t system, gyro, accel, mag;
         system = gyro = accel = mag = 0;
 
-        u_int8_t curYPos = display.getCursorY();
+        u_int8_t curYPos = screen.display.getCursorY();
         while (!system) {
             bno.getCalibration(&system, &gyro, &accel, &mag);
-            display.setCursor(0, curYPos);
+            screen.display.setCursor(0, curYPos);
             /* Display the individual values */
-            display.print("Sys:");
-            display.print(system, DEC);
-            display.print(" G:");
-            display.print(gyro, DEC);
-            display.print(" A:");
-            display.print(accel, DEC);
-            display.print(" M:");
-            display.println(mag, DEC);
-            display.display();
+            screen.display.print("Sys:");
+            screen.display.print(system, DEC);
+            screen.display.print(" G:");
+            screen.display.print(gyro, DEC);
+            screen.display.print(" A:");
+            screen.display.print(accel, DEC);
+            screen.display.print(" M:");
+            screen.display.println(mag, DEC);
+            screen.display.display();
         };
-        display.println("calibrated OK");
-        display.display();
+        screen.display.println("calibrated OK");
+        screen.display.display();
         delay(200);
     }
 }
@@ -674,21 +664,21 @@ void loop() {
     bool shouldInvertDisplay = false;
     // Have we missed 10 valid motor messages?
 
-    display.clearDisplay();
-    display.setCursor(0, 0);
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 0);
     if (missedMotorMessageCount >= 10) {
         shouldInvertDisplay = true;
-        display.printf("missed message %d", missedMotorMessageCount);
-        display.display();
+        screen.display.printf("missed message %d", missedMotorMessageCount);
+        screen.display.display();
     }
     // is battery going flat?
     if (batteryVoltage() < minBatVoltage) {
         shouldInvertDisplay = true;
-        display.printf("low battery");
-        display.display();
+        screen.display.printf("low battery");
+        screen.display.display();
     }
 
-    display.invertDisplay(shouldInvertDisplay);
+    screen.display.invertDisplay(shouldInvertDisplay);
 
     // If we have missed 10 valid motor messages
     // or the battery is going flat
@@ -703,19 +693,21 @@ void loop() {
         for (uint8_t t = 0; t < 8; t++) {
             tcaselect(t);
             if (activeToFSensors[t]) {
-                distances[t] = sensor.readRangeContinuousMillimeters();
+                robotStatus.sensors.tofDistances[t] = sensor.readRangeContinuousMillimeters();
                 if (sensor.timeoutOccurred()) {
-                    distances[t] = 0;
+                    robotStatus.sensors.tofDistances[t] = 0;
                 }
             } else {
-                distances[t] = 0;
+                robotStatus.sensors.tofDistances[t] = 0;
             }
         }
 
         /// Read Encoder counts
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-            oldEncoderReadings[n] = encoderReadings[n];
-            encoderReadings[n] = encoders[n].read();
+            robotStatus.sensors.encoders.previous[n] = robotStatus.sensors.encoders.current[n];
+            // oldEncoderReadings[n] = encoderReadings[n];
+            robotStatus.sensors.encoders.current[n] = encoders[n].read();
+            // encoderReadings[n] = encoders[n].read();
         }
 
         // Read IMU
@@ -734,10 +726,10 @@ void loop() {
         currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
 
         // Prepare the distance data
-        payloadSize = myTransfer.txObj(distances, payloadSize);
+        payloadSize = myTransfer.txObj(robotStatus.sensors.tofDistances, payloadSize);
 
         //Prepare encoder data
-        payloadSize = myTransfer.txObj(encoderReadings, payloadSize);
+        payloadSize = myTransfer.txObj(robotStatus.sensors.encoders.current, payloadSize);
 
         //Prepare IMU data
         payloadSize = myTransfer.txObj(orientationReading, payloadSize);
