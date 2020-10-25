@@ -2,6 +2,8 @@
 #define _STATUS__H_
 
 #include <stdint.h>
+#include <Adafruit_Sensor.h>
+
 struct OrientationReading {
     float x = 0;
     float y = 0;

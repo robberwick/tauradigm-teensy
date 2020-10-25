@@ -3,6 +3,8 @@
 #include <Adafruit_SSD1306.h>
 #include <Wire.h>
 
+#include "status.h"
+
 class Screen {
    public:
     Screen(uint8_t w, uint8_t h, TwoWire *twi = &Wire,
@@ -22,11 +24,27 @@ class Screen {
         IMU,
         SENSOR_DATA,
         TIMING,
+        ERROR,
     };
     void setMode(Screen::Mode mode);
+    void showScreen(Status &status);
 
    private:
     Screen::Mode _currentMode = Screen::Mode::IMU;
+    void showPostMotors();
+    void showPostSerial();
+    void showPostTOF();
+    void showPostADC();
+    void showPostIMU();
+    void showPostIMUCalibrationStatus();
+    void showPostIMUCalibrate();
+    void showPostIMUCalibrationComplete();
+    void showStartup();
+    void showIMU();
+    void showSensorData();
+    void showTiming();
+    void showError(Status &status);
+
 };
 
 #endif  //  SCREEN__H_

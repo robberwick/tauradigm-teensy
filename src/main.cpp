@@ -97,15 +97,6 @@ float minMagnitude(float x, float y, float z) {
     return currentMin;
 }
 
-// struct Pose updatePose(struct Pose oldPosition, float heading, float distanceTravelled) {
-//     // takes current position, new heading and distance traveled to work out a new position
-//     struct Pose newPosition;
-//     newPosition.heading = heading;
-//     newPosition.x = oldPosition.x + distanceTravelled * cos(heading);
-//     newPosition.y = oldPosition.y + distanceTravelled * sin(heading);
-//     return newPosition;
-// }
-
 float wrapTwoPi(float angle) {
     //wraps an angle to stay within +/-pi
     while (angle > M_PI) angle -= TWO_PI;
@@ -638,29 +629,14 @@ void loop() {
         receiveMessage.restart();
     }
 
-    bool shouldInvertDisplay = false;
-    // Have we missed 10 valid motor messages?
+    // screen.display.invertDisplay(shouldInvertDisplay);
+    if (robotStatus.batteryIsLow() || robotStatus.motorMessageCommsDown()) {
+        screen.setMode(Screen::Mode::ERROR);
 
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 0);
-    if (robotStatus.motorMessageCommsDown()) {
-        shouldInvertDisplay = true;
-        screen.display.printf("missed message %d", robotStatus.missedMotorMessageCount);
-        screen.display.display();
-    }
-    // is battery going flat?
-    if (robotStatus.batteryIsLow()) {
-        shouldInvertDisplay = true;
-        screen.display.printf("low battery");
-        screen.display.display();
-    }
+        // TODO move this outside the if block when we're only using the screen class for displaying info
+        screen.showScreen(robotStatus);
 
-    screen.display.invertDisplay(shouldInvertDisplay);
-
-    // If we have missed 10 valid motor messages
-    // or the battery is going flat
-    // set motors to dead stop
-    if ((robotStatus.motorMessageCommsDown()) || (robotStatus.batteryIsLow())) {
+        // Set motors to dead stop
         setMotorSpeeds(deadStop, motorLeft, motorRight);
     }
 
@@ -687,8 +663,6 @@ void loop() {
 
         // Read IMU
         // Update orientation status
-
-
         sensors_event_t orientationData;
         bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
         robotStatus.updateOrientation(orientationData);
