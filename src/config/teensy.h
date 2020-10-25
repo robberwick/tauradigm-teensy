@@ -1,7 +1,3 @@
-#include <unordered_map>
-using namespace std; 
-
-// Pins
 #define TEENSY_PIN_ENC1A (0)
 #define TEENSY_PIN_ENC1B (1)
 #define TEENSY_PIN_ENC2A (2)
@@ -27,23 +23,3 @@ using namespace std;
 #define TEENSY_PIN_DRIVE_LEFT (22)
 #define TEENSY_PIN_DRIVE_RIGHT (23)
 #define TEENSY_PIN_BUTTON (A14)
-
-// i2c Addresses
-#define TCA_ADDR 0x70
-#define DISPLAY_ADDR 0x3c
-#define IMU_ADDR 0x28
-#define TOF_ADDR 0x29
-#define ADC_ADDR 0x48
-typedef const std::unordered_map<uint8_t, String> HexIntMap;
-HexIntMap I2C_ADDRESS_NAMES = {
-   {TCA_ADDR, "Multiplexer"},
-   {IMU_ADDR, "IMU"},
-   {TOF_ADDR, "Distance sensor"},
-   {DISPLAY_ADDR, "OLED display"},
-   {ADC_ADDR, "Minesweeper ADC"}
-};
-// hardware counts
-#define NUM_ENCODERS 6
-
-// timing constants
-#define BNO055_SAMPLERATE_DELAY_MS (100)
