@@ -745,9 +745,6 @@ void loop() {
         processMessage(myTransfer);
     }
 
-    int messageSize=0;
-    messageSize = myTransfer.packet.bytesToRec;
-
 
     // if the message sending timeout has passed then increment the missed count
     // and reset
@@ -761,8 +758,7 @@ void loop() {
 
     display.clearDisplay();
     display.setCursor(0, 0);
-    display.printf("mess size: %d", messageSize);
-    display.println(" ");
+
     if (missedMotorMessageCount >= 10) {
         shouldInvertDisplay = true;
         display.printf("missed message %d", missedMotorMessageCount);
@@ -843,4 +839,9 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
+    display.printf("sensor2: %2.2f", distances[2]);
+    display.println(" ");
+    display.printf("sensor 3: %2.2f", distances[3]);
+    display.display();
+
 }
