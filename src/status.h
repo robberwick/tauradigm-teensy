@@ -37,6 +37,9 @@ class Status {
 
     float getBatteryVoltage();
     boolean batteryIsLow();
+    void incrementMissedMotorCount();
+    void resetMissedMotorCount();
+
 
    private:
     float _minBatVoltage = 11.1;

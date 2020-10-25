@@ -253,14 +253,6 @@ void do_i2c_scan() {
     delay(4000);
 }
 
-void incrementMissedMotorCount() {
-    robotStatus.missedMotorMessageCount++;
-}
-
-void resetMissedMotorCount() {
-    robotStatus.missedMotorMessageCount = 0;
-}
-
 void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorRight) {
     Speeds commandMotorSpeeds, targetMotorSpeeds;
 
@@ -311,7 +303,7 @@ void processMessage(SerialTransfer &transfer) {
             transfer.rxObj(requestedMotorSpeeds, recSize);
             setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
             // reset the missed motor mdessage count
-            resetMissedMotorCount();
+            robotStatus.resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessage.restart();
     }
@@ -645,7 +637,7 @@ void loop() {
     // if the message sending timeout has passed then increment the missed count
     // and reset
     if (receiveMessage.hasPassed(20)) {
-        incrementMissedMotorCount();
+        robotStatus.incrementMissedMotorCount();
         receiveMessage.restart();
     }
 

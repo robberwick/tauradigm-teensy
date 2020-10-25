@@ -22,3 +22,10 @@ boolean Status::batteryIsLow() {
     return getBatteryVoltage() < _minBatVoltage;
 }
 
+void Status::incrementMissedMotorCount() {
+    missedMotorMessageCount++;
+}
+
+void Status::resetMissedMotorCount() {
+    missedMotorMessageCount = 0;
+}
