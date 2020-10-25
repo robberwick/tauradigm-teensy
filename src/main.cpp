@@ -47,6 +47,7 @@ uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
 float trackWidth = 136;
+float travelPerEncoderCount = 0.262;  //millimeters per encoder count. from testing
 
 SerialTransfer myTransfer;
 
@@ -136,19 +137,29 @@ float batteryVoltage() {
     voltage = adcReading * (26.9 + 10.0) / 10.0 + 4;
     return voltage;
 }
+Speeds getWheelTravel() {
+    // Uses minimum encoder reading to estimate actual travel speed.
+    // returns a speed struct of wheel travel in mm
 
-float getDistanceTravelled() {
-    // Uses minimum encoder reading to estimate actual travel speed. returns a speed struct
-    float travelPerEncoderCount = 1.0;  //millimeters per encoder count. from testing
     //compare old and latest encoder readings to see how much each wheel has rotated
-    //speed is distance/time and should be a float in mm/sec
     float wheelTravel[NUM_ENCODERS];
     for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
         wheelTravel[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) * travelPerEncoderCount;
     }
-    float rightTravel = minMagnitude(wheelTravel[3], wheelTravel[5], wheelTravel[5]);
-    float leftTravel = minMagnitude(wheelTravel[0], wheelTravel[1], wheelTravel[1]);
-    return (leftTravel - rightTravel) / 2;
+    //most representative speed assumed to be slowest wheel
+    //#0, #1 & #3 is left,  #3, #4 & #5 is right
+    //#0 is front left     #3 is front right
+    //#1 is rear left      #4 is middle right
+    //#2 is middle left    #5 is rear right
+    Speeds travel;
+    travel.right = minMagnitude(wheelTravel[3], wheelTravel[4], wheelTravel[5]);
+    travel.left = minMagnitude(wheelTravel[0], wheelTravel[1], wheelTravel[2]);
+    return travel;
+}
+float getDistanceTravelled() {
+    //returns the average distance travelled by right and left wheels, in mm
+    Speeds travel = getWheelTravel();
+    return (travel.left - travel.right) / 2;
 }
 
 struct Speeds feedForward(struct Speeds targetSpeeds) {
@@ -204,27 +215,16 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
 
     float loopTime = (millis() - lastLoopTime) / 1000.0;  // divide by 1000 converts to seconds.
     lastLoopTime = millis();
-    float travelPerEncoderCount = 1;  //millimeters per encoder count. from testing
 
     //work out target turn rate
     float targetTurnRate = (targetSpeeds.left - targetSpeeds.right) / trackWidth;
 
     //compare old and latest encoder readings to see how much each wheel has rotated
     //speed is distance/time and should be a float in mm/sec
-    float motorSpeeds[NUM_ENCODERS];
-    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-        motorSpeeds[n] = ((float)(encoderReadings[n] - oldEncoderReadings[n])) / loopTime * travelPerEncoderCount;
-    }
-
-    //most representative speed assumed to be slowest wheel
-    //#0, #1 & #3 is left,  #3, #4 & #5 is right
-    //#0 is front left     #3 is front right
-    //#1 is rear left      #4 is middle right
-    //#2 is middle left    #5 is rear right
+    Speeds travel = getWheelTravel();
     Speeds actualMotorSpeeds;
-
-    actualMotorSpeeds.right = minMagnitude(motorSpeeds[3], motorSpeeds[5], motorSpeeds[5]);
-    actualMotorSpeeds.left = minMagnitude(motorSpeeds[0], motorSpeeds[1], motorSpeeds[1]);
+    actualMotorSpeeds.right = travel.right/loopTime;
+    actualMotorSpeeds.left = travel.left/loopTime;
 
     //work out actual turn rate
     float actualTurnRate = wrapTwoPi(orientationReading.x - oldOrientationReading.x) / loopTime;
