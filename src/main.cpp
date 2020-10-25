@@ -325,6 +325,38 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
 
+void nudge(bool leftForward = true, bool rightForward = true, float minChange = 5) {
+    Speeds motorPower, direction;
+    float nudgePower = 20;       //determined from practical testing
+    
+    direction.left = leftForward ? 1 : -1;
+    direction.right = rightForward ? 1 : -1;
+    
+
+    //assign a small value that should be enough to move, but not quickly
+    motorPower.left = nudgePower * direction.left;
+    motorPower.right = nudgePower * direction.right;
+    motorLeft.writeMicroseconds(map(motorPower.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(motorPower.right * -1, -100, 100, 1000, 2000));
+
+    float change;
+    long encoderChange[NUM_ENCODERS];
+    while (change<minChange){
+        /// Read Encoder counts
+        for (u_int8_t n = 0; n < 3; n++) {
+            encoderChange[n] = encoders[n].read()-encoderReadings[n];
+        }
+        change = direction.left * (encoderChange[0]+encoderChange[1]+encoderChange[2]);
+        change -= direction.right * (encoderChange[3]+encoderChange[4]+encoderChange[5]);
+        delay(1);
+    }
+
+    motorPower = deadStop;
+    motorLeft.writeMicroseconds(map(motorPower.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(motorPower.right * -1, -100, 100, 1000, 2000));
+
+}
+
 void processMessage(SerialTransfer &transfer) {
     // use this variable to keep track of how many
     // bytes we've processed from the receive buffer
@@ -336,7 +368,6 @@ void processMessage(SerialTransfer &transfer) {
     switch (messageType) {
         // 0 - motor speed message
         case 1:
-        default:
             Speeds requestedMotorSpeeds;
             transfer.rxObj(requestedMotorSpeeds, recSize);
             setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
@@ -344,6 +375,36 @@ void processMessage(SerialTransfer &transfer) {
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessage.restart();
+        case 2:
+            char button;
+            transfer.rxObj(button, sizeof(button), sizeof(messageType));
+            switch (button) {
+                case 'l':
+                    display.println(F("nudging left"));
+                    display.display();
+                    nudge(false, true, 100);
+                    break;
+                case 'r':
+                    display.println(F("nudging left"));
+                    display.display();
+                    nudge(true, false, 100);
+                    break;
+                case 'u':
+                    display.println(F("nudging forward"));
+                    display.display();
+                    nudge(true, true, 3);
+                    break;
+                case 'd':
+                    display.println(F("nudging back"));
+                    display.display();
+                    nudge(false, false, 3);
+                    break;
+            }
+            break;
+        default:
+            display.printf("invalid message type received %i", messageType);
+            display.display();
+            delay(500); 
     }
 }
 
