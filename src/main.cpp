@@ -68,7 +68,6 @@ Status robotStatus = Status();
 Screen screen(128, 64);
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
-OrientationReading orientationReading, oldOrientationReading;
 
 void tcaselect(uint8_t i) {
     if (i > 7) {
@@ -204,7 +203,8 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     actualMotorSpeeds.left = travel.left/loopTime;
 
     //work out actual turn rate
-    float actualTurnRate = wrapTwoPi(orientationReading.x - oldOrientationReading.x) / loopTime;
+    // TODO - do this in the status obj? How to get loop time?
+    float actualTurnRate = wrapTwoPi(robotStatus.orientation.x - robotStatus.previousOrientation.x) / loopTime;
 
     // do actual Proportional calc.
     //speed error is target - actual.
@@ -686,18 +686,21 @@ void loop() {
         }
 
         // Read IMU
+        // Update orientation status
+
+
         sensors_event_t orientationData;
         bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
-        oldOrientationReading = orientationReading;
-        orientationReading.x = radians(orientationData.orientation.x);
-        orientationReading.y = radians(orientationData.orientation.y);
-        orientationReading.z = radians(orientationData.orientation.z);
+        robotStatus.updateOrientation(orientationData);
 
         uint16_t payloadSize = 0;
 
         //update odometry
         float distanceMoved = getDistanceTravelled();
-        robotStatus.updatePose(orientationReading.x, distanceMoved);
+        // Update pose based on current heading and distance moved
+        // ensure that the orientation data has been updated first
+        // TODO tidy this up
+        robotStatus.updatePose(robotStatus.orientation.x, distanceMoved);
 
         // Prepare the distance data
         payloadSize = myTransfer.txObj(robotStatus.sensors.tofDistances, payloadSize);
@@ -706,7 +709,7 @@ void loop() {
         payloadSize = myTransfer.txObj(robotStatus.sensors.encoders.current, payloadSize);
 
         //Prepare IMU data
-        payloadSize = myTransfer.txObj(orientationReading, payloadSize);
+        payloadSize = myTransfer.txObj(robotStatus.orientation, payloadSize);
 
         //Prepare odometry data
         payloadSize = myTransfer.txObj(robotStatus.pose, payloadSize);

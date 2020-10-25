@@ -37,11 +37,17 @@ class Status {
 
     float getBatteryVoltage();
     bool batteryIsLow();
+
     void incrementMissedMotorCount();
     void resetMissedMotorCount();
     bool motorMessageCommsDown();
+
     Pose updatePose(float heading, float distanceTravelled);
 
+    void updateOrientation(sensors_event_t orientationData);
+
+    OrientationReading orientation;
+    OrientationReading previousOrientation;
 
    private:
     float _minBatVoltage = 11.1;

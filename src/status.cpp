@@ -1,3 +1,4 @@
+#include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include "status.h"
 #include "config.h"
@@ -40,4 +41,11 @@ Pose Status::updatePose(float heading, float distanceTravelled) {
     pose.x = pose.x + distanceTravelled * cos(heading);
     pose.y = pose.y + distanceTravelled * sin(heading);
     return pose;
+}
+
+void Status::updateOrientation(sensors_event_t orientationData) {
+    previousOrientation = sensors.orientation;
+    sensors.orientation.x = radians(orientationData.orientation.x);
+    sensors.orientation.y = radians(orientationData.orientation.y);
+    sensors.orientation.z = radians(orientationData.orientation.z);
 }
