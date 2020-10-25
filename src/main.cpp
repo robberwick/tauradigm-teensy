@@ -238,15 +238,6 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
     float turnKp = 2;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
-    display.println(" ");
-    display.printf("target rate:%2.2f", targetTurnRate);
-    display.println(" ");
-    display.printf("actual rate:%2.2f", actualTurnRate);
-    display.println(" ");
-    display.printf("steering correction: %2.2f", steeringCorrection);
-    display.println(" ");
-    display.printf("heading: %2.2f", orientationReading.x);
-    display.display();
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right -= steeringCorrection;
 
