@@ -40,6 +40,7 @@ class Status {
     void incrementMissedMotorCount();
     void resetMissedMotorCount();
     bool motorMessageCommsDown();
+    Pose updatePose(float heading, float distanceTravelled);
 
 
    private:

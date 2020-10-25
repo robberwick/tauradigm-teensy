@@ -28,8 +28,6 @@ HardwareSerial Serial2(USART2);
 Servo motorLeft;
 Servo motorRight;
 
-Pose currentPosition, previousPosition;
-
 float averageSpeed;
 float minSpeed = 20;
 
@@ -100,14 +98,14 @@ float minMagnitude(float x, float y, float z) {
     return currentMin;
 }
 
-struct Pose updatePose(struct Pose oldPosition, float heading, float distanceTravelled) {
-    // takes current position, new heading and distance traveled to work out a new position
-    struct Pose newPosition;
-    newPosition.heading = heading;
-    newPosition.x = oldPosition.x + distanceTravelled * cos(heading);
-    newPosition.y = oldPosition.y + distanceTravelled * sin(heading);
-    return newPosition;
-}
+// struct Pose updatePose(struct Pose oldPosition, float heading, float distanceTravelled) {
+//     // takes current position, new heading and distance traveled to work out a new position
+//     struct Pose newPosition;
+//     newPosition.heading = heading;
+//     newPosition.x = oldPosition.x + distanceTravelled * cos(heading);
+//     newPosition.y = oldPosition.y + distanceTravelled * sin(heading);
+//     return newPosition;
+// }
 
 float wrapTwoPi(float angle) {
     //wraps an angle to stay within +/-pi
@@ -487,7 +485,6 @@ void post() {
     screen.display.setCursor(0, 0);
     screen.display.println("Running");
     screen.display.display();
-    currentPosition.heading = currentPosition.x = currentPosition.y = 0;
 }
 
 void setup() {
@@ -699,9 +696,8 @@ void loop() {
         uint16_t payloadSize = 0;
 
         //update odometry
-        previousPosition = currentPosition;
         float distanceMoved = getDistanceTravelled();
-        currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
+        robotStatus.updatePose(orientationReading.x, distanceMoved);
 
         // Prepare the distance data
         payloadSize = myTransfer.txObj(robotStatus.sensors.tofDistances, payloadSize);
@@ -713,7 +709,7 @@ void loop() {
         payloadSize = myTransfer.txObj(orientationReading, payloadSize);
 
         //Prepare odometry data
-        payloadSize = myTransfer.txObj(currentPosition, payloadSize);
+        payloadSize = myTransfer.txObj(robotStatus.pose, payloadSize);
 
         // Send data
         myTransfer.sendData(payloadSize);
