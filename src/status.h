@@ -36,10 +36,10 @@ class Status {
     uint32_t missedMotorMessageCount = 0;
 
     float getBatteryVoltage();
-    boolean batteryIsLow();
+    bool batteryIsLow();
     void incrementMissedMotorCount();
     void resetMissedMotorCount();
-    boolean motorMessageCommsDown();
+    bool motorMessageCommsDown();
 
 
    private:

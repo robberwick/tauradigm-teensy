@@ -18,7 +18,7 @@ float Status::getBatteryVoltage() {
     return voltage;
 }
 
-boolean Status::batteryIsLow() {
+bool Status::batteryIsLow() {
     return getBatteryVoltage() < _minBatVoltage;
 }
 
@@ -30,7 +30,7 @@ void Status::resetMissedMotorCount() {
     missedMotorMessageCount = 0;
 }
 
-boolean Status::motorMessageCommsDown() {
+bool Status::motorMessageCommsDown() {
     // TODO Make MAX_MISSED_MOTOR_MESSAGES a class prop?
     return missedMotorMessageCount >= MAX_MISSED_MOTOR_MESSAGES;
 }
