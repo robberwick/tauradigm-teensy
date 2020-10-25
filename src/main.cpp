@@ -646,7 +646,7 @@ void loop() {
 
     screen.display.clearDisplay();
     screen.display.setCursor(0, 0);
-    if (robotStatus.missedMotorMessageCount >= 10) {
+    if (robotStatus.motorMessageCommsDown()) {
         shouldInvertDisplay = true;
         screen.display.printf("missed message %d", robotStatus.missedMotorMessageCount);
         screen.display.display();
@@ -663,7 +663,7 @@ void loop() {
     // If we have missed 10 valid motor messages
     // or the battery is going flat
     // set motors to dead stop
-    if ((robotStatus.missedMotorMessageCount >= 10) || (robotStatus.batteryIsLow())) {
+    if ((robotStatus.motorMessageCommsDown()) || (robotStatus.batteryIsLow())) {
         setMotorSpeeds(deadStop, motorLeft, motorRight);
     }
 
@@ -685,9 +685,7 @@ void loop() {
         /// Read Encoder counts
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
             robotStatus.sensors.encoders.previous[n] = robotStatus.sensors.encoders.current[n];
-            // oldEncoderReadings[n] = encoderReadings[n];
             robotStatus.sensors.encoders.current[n] = encoders[n].read();
-            // encoderReadings[n] = encoders[n].read();
         }
 
         // Read IMU

@@ -39,4 +39,7 @@ HexIntMap I2C_ADDRESS_NAMES = {
 // timing constants
 #define BNO055_SAMPLERATE_DELAY_MS (100)
 
+// Comms constants
+#define MAX_MISSED_MOTOR_MESSAGES 10
+
 #endif //_CONFIG__H_

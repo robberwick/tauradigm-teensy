@@ -29,3 +29,8 @@ void Status::incrementMissedMotorCount() {
 void Status::resetMissedMotorCount() {
     missedMotorMessageCount = 0;
 }
+
+boolean Status::motorMessageCommsDown() {
+    // TODO Make MAX_MISSED_MOTOR_MESSAGES a class prop?
+    return missedMotorMessageCount >= MAX_MISSED_MOTOR_MESSAGES;
+}

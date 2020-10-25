@@ -39,6 +39,7 @@ class Status {
     boolean batteryIsLow();
     void incrementMissedMotorCount();
     void resetMissedMotorCount();
+    boolean motorMessageCommsDown();
 
 
    private:
