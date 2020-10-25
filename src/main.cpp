@@ -1,6 +1,6 @@
 #include <Adafruit_ADS1015.h>
 #include <Adafruit_BNO055.h>
-// #include <Adafruit_SSD1306.h>
+#include <Adafruit_SSD1306.h>
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <Chrono.h>
@@ -37,7 +37,6 @@ Speeds deadStop = {0, 0};
 
 long lastLoopTime = millis();
 float loopTime = 0;
-uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
 float trackWidth = 136;
@@ -66,7 +65,8 @@ Encoder encoders[NUM_ENCODERS] = {
 long encoderReadings[NUM_ENCODERS];
 long oldEncoderReadings[NUM_ENCODERS];
 
-Status robotStatus;
+Status robotStatus = Status();
+
 Screen screen(128, 64);
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
@@ -116,18 +116,6 @@ float wrapTwoPi(float angle) {
     return angle;
 }
 
-float batteryVoltage() {
-    //reads ADC, interprets it and
-    //returns battery voltage as a float
-    float adcReading, voltage;
-    //AnalogRead returns 10bit fraction of Vdd
-    adcReading = analogRead(TEENSY_PIN_BATT_SENSE) * 3.3 / 1023.0;
-
-     //ADC reads battery via a potential divider of 33k and 10k
-     //but they're wrong/out of spec ((33+10)/10 = 4.3)
-    voltage = adcReading * 3.71;
-    return voltage;
-}
 Speeds getWheelTravel() {
     // Uses minimum encoder reading to estimate actual travel speed.
     // returns a speed struct of wheel travel in mm
@@ -266,11 +254,11 @@ void do_i2c_scan() {
 }
 
 void incrementMissedMotorCount() {
-    missedMotorMessageCount++;
+    robotStatus.missedMotorMessageCount++;
 }
 
 void resetMissedMotorCount() {
-    missedMotorMessageCount = 0;
+    robotStatus.missedMotorMessageCount = 0;
 }
 
 void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorRight) {
@@ -551,7 +539,7 @@ void setup() {
     screen.display.println("Press button now to  enter POST");
     screen.display.println();
     screen.display.println("Battery Voltage:");
-    screen.display.printf("%2.2f V", batteryVoltage());
+    screen.display.printf("%2.2f V", robotStatus.getBatteryVoltage());
     screen.display.display();
     delay(2000);
     uint32_t buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
@@ -666,13 +654,13 @@ void loop() {
 
     screen.display.clearDisplay();
     screen.display.setCursor(0, 0);
-    if (missedMotorMessageCount >= 10) {
+    if (robotStatus.missedMotorMessageCount >= 10) {
         shouldInvertDisplay = true;
-        screen.display.printf("missed message %d", missedMotorMessageCount);
+        screen.display.printf("missed message %d", robotStatus.missedMotorMessageCount);
         screen.display.display();
     }
     // is battery going flat?
-    if (batteryVoltage() < minBatVoltage) {
+    if (robotStatus.batteryIsLow()) {
         shouldInvertDisplay = true;
         screen.display.printf("low battery");
         screen.display.display();
@@ -683,7 +671,7 @@ void loop() {
     // If we have missed 10 valid motor messages
     // or the battery is going flat
     // set motors to dead stop
-    if ((missedMotorMessageCount >= 10) || (batteryVoltage() < minBatVoltage)) {
+    if ((robotStatus.missedMotorMessageCount >= 10) || (robotStatus.batteryIsLow())) {
         setMotorSpeeds(deadStop, motorLeft, motorRight);
     }
 

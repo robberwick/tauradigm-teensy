@@ -1,3 +1,7 @@
+#ifndef _STATUS__H_
+#define _STATUS__H_
+
+#include <stdint.h>
 struct OrientationReading {
     float x = 0;
     float y = 0;
@@ -5,7 +9,7 @@ struct OrientationReading {
 };
 
 struct Pose {
-    float heading =0 ;
+    float heading = 0;
     float x = 0;
     float y = 0;
 };
@@ -24,9 +28,18 @@ struct Speeds {
     float right = 0.0;
 };
 
-struct Status {
-    float batteryVoltage = 0;
+class Status {
+   public:
     SensorData sensors;
     Speeds speed;
     Pose pose;
+    uint32_t missedMotorMessageCount = 0;
+
+    float getBatteryVoltage();
+    boolean batteryIsLow();
+
+   private:
+    float _minBatVoltage = 11.1;
 };
+
+#endif  //_STATUS__H_
