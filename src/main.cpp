@@ -65,7 +65,7 @@ long oldEncoderReadings[NUM_ENCODERS];
 
 Status robotStatus = Status();
 
-Screen screen(128, 64);
+Screen screen(robotStatus, 128, 64);
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
 
@@ -634,7 +634,7 @@ void loop() {
         screen.setMode(Screen::Mode::ERROR);
 
         // TODO move this outside the if block when we're only using the screen class for displaying info
-        screen.showScreen(robotStatus);
+        screen.showScreen();
 
         // Set motors to dead stop
         setMotorSpeeds(deadStop, motorLeft, motorRight);

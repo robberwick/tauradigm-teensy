@@ -7,7 +7,7 @@
 
 class Screen {
    public:
-    Screen(uint8_t w, uint8_t h, TwoWire *twi = &Wire,
+    Screen(Status &status, uint8_t w, uint8_t h, TwoWire *twi = &Wire,
            int8_t rst_pin = -1, uint32_t clkDuring = 400000UL,
            uint32_t clkAfter = 100000UL);
     Adafruit_SSD1306 display;
@@ -27,10 +27,11 @@ class Screen {
         ERROR,
     };
     void setMode(Screen::Mode mode);
-    void showScreen(Status &status);
+    void showScreen();
 
    private:
     Screen::Mode _currentMode = Screen::Mode::IMU;
+    Status &_status;
     void showPostMotors();
     void showPostSerial();
     void showPostTOF();
@@ -43,8 +44,7 @@ class Screen {
     void showIMU();
     void showSensorData();
     void showTiming();
-    void showError(Status &status);
-
+    void showError();
 };
 
 #endif  //  SCREEN__H_

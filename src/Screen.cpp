@@ -1,8 +1,8 @@
 #include "screen.h"
 
-Screen::Screen(uint8_t w, uint8_t h, TwoWire *twi,
+Screen::Screen(Status &status, uint8_t w, uint8_t h, TwoWire *twi,
                int8_t rst_pin, uint32_t clkDuring,
-               uint32_t clkAfter) {
+               uint32_t clkAfter) : _status(status) {
     display = Adafruit_SSD1306(w, h, twi, rst_pin, clkDuring, clkAfter);
 }
 
@@ -10,61 +10,61 @@ void Screen::setMode(Screen::Mode mode) {
     _currentMode = mode;
 }
 
-void Screen::showScreen(Status &status) {
+void Screen::showScreen() {
     switch (_currentMode) {
         case Mode::POST_MOTORS:
-        break;
+            break;
 
         case Mode::POST_SERIAL:
-        break;
+            break;
 
         case Mode::POST_TOF:
-        break;
+            break;
 
         case Mode::POST_ADC:
-        break;
+            break;
 
         case Mode::POST_IMU:
-        break;
+            break;
 
         case Mode::POST_IMU_CALIBRATION_STATUS:
-        break;
+            break;
 
         case Mode::POST_IMU_CALIBRATE:
-        break;
+            break;
 
         case Mode::POST_IMU_CALIBRATION_COMPLETE:
-        break;
+            break;
 
         case Mode::START_UP:
-        break;
+            break;
 
         case Mode::IMU:
-        break;
+            break;
 
         case Mode::SENSOR_DATA:
-        break;
+            break;
 
         case Mode::TIMING:
-        break;
+            break;
 
         case Mode::ERROR:
-        showError(status);
+            showError();
 
-        break;
+            break;
     }
 }
 
-void Screen::showError(Status &status) {
-    bool shouldInvertDisplay = (status.motorMessageCommsDown() || status.batteryIsLow());
+void Screen::showError() {
+    bool shouldInvertDisplay = (_status.motorMessageCommsDown() || _status.batteryIsLow());
     display.clearDisplay();
     display.setCursor(0, 0);
-    if (status.motorMessageCommsDown()) {
-        display.printf("missed message %d", status.missedMotorMessageCount);
+    if (_status.motorMessageCommsDown()) {
+        display.printf("missed message %d", _status.missedMotorMessageCount);
         display.println();
     }
     // is battery going flat?
-    if (status.batteryIsLow()) {
+    if (_status.batteryIsLow()) {
         display.printf("low battery");
         display.println();
     }
