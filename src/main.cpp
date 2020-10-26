@@ -83,6 +83,8 @@ struct OrientationReading {
     float z;
 } orientationReading, oldOrientationReading;
 
+bool boxFinding = false;
+
 void tcaselect(uint8_t i) {
     if (i > 7) {
         return;
@@ -323,6 +325,48 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
 
+void findBox(){
+    Speeds boxFindingSpeed;
+    float minSpeed = 28;
+    float turnSpeed = 15;
+    float minBoxDist, maxBoxDist, maxSeekDist;
+    minBoxDist = 100;
+    maxBoxDist = 250;
+    maxSeekDist = 300;
+    float leftSensor, rightSensor;
+    leftSensor = distances[2];
+    rightSensor = distances[3];
+    if ((leftSensor < maxSeekDist) || (rightSensor < maxSeekDist)) {
+        if ((leftSensor > minBoxDist) && (leftSensor < maxBoxDist) && (rightSensor > minBoxDist) && (rightSensor < maxBoxDist)){
+            boxFindingSpeed = deadStop;
+            boxFinding = false;
+            display.println(F("in position"));
+        }
+        if (leftSensor < rightSensor) {
+            display.println(F("turning left"));
+        } else {
+            display.println(F("turning right"));
+        }
+        float turnError;
+        float turnP = 0.01;
+        turnError = leftSensor - rightSensor;
+        turnSpeed = min(max(turnError * turnP, -turnSpeed), turnSpeed);
+        boxFindingSpeed.left = (minSpeed + turnSpeed);
+        boxFindingSpeed.right = (minSpeed - turnSpeed);
+        if ((leftSensor < minBoxDist) && (rightSensor < minBoxDist)){
+            boxFindingSpeed.left = -minSpeed;
+            boxFindingSpeed.right = -minSpeed;
+            display.println(F("reversing"));
+        }
+    } else {
+        boxFindingSpeed.left = minSpeed;
+        boxFindingSpeed.right = minSpeed;
+        display.println(F("looking for box"));        
+    }
+    
+    setMotorSpeeds(boxFindingSpeed, motorLeft, motorRight);
+}
+
 void processMessage(SerialTransfer &transfer) {
     // use this variable to keep track of how many
     // bytes we've processed from the receive buffer
@@ -339,7 +383,9 @@ void processMessage(SerialTransfer &transfer) {
 //            transfer.rxObj(messages, sizeof(messages), sizeof(messageType));
 //            requestedMotorSpeeds = {messages[0], messages[1]};
             transfer.rxObj(requestedMotorSpeeds, recSize);
-            setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
+            if (!boxFinding){
+                setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
+            }
             // reset the missed motor mdessage count
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
@@ -370,6 +416,18 @@ void processMessage(SerialTransfer &transfer) {
                 case 't':
                     esc_2.writeMicroseconds(2100);
                     display.println(F("jaw up"));
+                    display.display();
+                    delay(200);
+                    break;
+                case 'u':
+                    boxFinding = true;
+                    display.println(F("box hunting engaged"));
+                    display.display();
+                    delay(200);
+                    break;
+                case 'd':
+                    boxFinding = false;
+                    display.println(F("box hunting disengaged"));
                     display.display();
                     delay(200);
                     break;
@@ -710,6 +768,12 @@ void loop() {
         processMessage(myTransfer);
     }
 
+    display.clearDisplay();
+    display.setCursor(0, 0);
+
+    if (boxFinding){
+        findBox();
+    }
 
     // if the message sending timeout has passed then increment the missed count
     // and reset
@@ -721,8 +785,6 @@ void loop() {
     bool shouldInvertDisplay = false;
     // Have we missed 10 valid motor messages?
 
-    display.clearDisplay();
-    display.setCursor(0, 0);
 
     if (missedMotorMessageCount >= 10) {
         shouldInvertDisplay = true;
@@ -797,7 +859,7 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
-    display.printf("sensor2: %2.2f", distances[2]);
+    display.printf("sensor 2: %2.2f", distances[2]);
     display.println(" ");
     display.printf("sensor 3: %2.2f", distances[3]);
     display.display();
