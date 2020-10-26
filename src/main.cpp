@@ -319,55 +319,10 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
         commandMotorSpeeds = deadStop;
     } else {
         //apply PID to motor powers based on deviation from target speed
-        commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
+        //commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
     }
     motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
-}
-
-void findBox(){
-    Speeds boxFindingSpeed;
-    float minSpeed = 28;
-    float turnSpeed = 25;
-    float minBoxDist, maxBoxDist, maxSeekDist;
-    minBoxDist = 150;
-    maxBoxDist = 200;
-    maxSeekDist = 300;
-    float leftSensor, rightSensor;
-    leftSensor = distances[2];
-    rightSensor = distances[3];
-    if ((leftSensor < maxSeekDist) || (rightSensor < maxSeekDist)) {
-        if ((leftSensor > minBoxDist) && (leftSensor < maxBoxDist) && (rightSensor > minBoxDist) && (rightSensor < maxBoxDist)){
-            boxFindingSpeed = deadStop;
-            boxFinding = false;
-            display.println(F("in position"));
-        }
-        if (leftSensor < rightSensor) {
-            display.println(F("turning left"));
-        } else {
-            display.println(F("turning right"));
-        }
-        float turnError;
-        float turnP = 0.01;
-        turnError = leftSensor - rightSensor;
-        turnSpeed = min(max(turnError * turnP, -turnSpeed), turnSpeed);
-        boxFindingSpeed.left = turnSpeed;
-        boxFindingSpeed.right = -turnSpeed;
-        if ((leftSensor > maxBoxDist) && (rightSensor > maxBoxDist)){
-            boxFindingSpeed.left += minSpeed;
-            boxFindingSpeed.right += minSpeed;
-        }
-        if ((leftSensor < minBoxDist) && (rightSensor < minBoxDist)){
-            boxFindingSpeed.left = -minSpeed;
-            boxFindingSpeed.right = -minSpeed;
-            display.println(F("reversing"));
-        }
-    } else {
-        boxFindingSpeed.left = minSpeed;
-        boxFindingSpeed.right = minSpeed;
-        display.println(F("looking for box"));        
-    }    
-    setMotorSpeeds(boxFindingSpeed, motorLeft, motorRight);
 }
 
 void nudge(bool leftForward = true, bool rightForward = true, float minChange = 5) {
@@ -386,21 +341,102 @@ void nudge(bool leftForward = true, bool rightForward = true, float minChange = 
 
     float change;
     long encoderChange[NUM_ENCODERS];
-    while (change<minChange){
+//    long encoderInitialValue[NUM_ENCODERS];
+    while (change < minChange){
         /// Read Encoder counts
-        for (u_int8_t n = 0; n < 3; n++) {
+        for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
             encoderChange[n] = encoders[n].read()-encoderReadings[n];
         }
         change = direction.left * (encoderChange[0]+encoderChange[1]+encoderChange[2]);
         change -= direction.right * (encoderChange[3]+encoderChange[4]+encoderChange[5]);
+        //display.clearDisplay();
+        //display.setCursor(0,0);
+        //display.printf("change: %4.0f", change);
+        //display.println(" ");
+        //display.display();
         delay(1);
     }
 
     motorPower = deadStop;
     motorLeft.writeMicroseconds(map(motorPower.left, -100, 100, 1000, 2000));
     motorRight.writeMicroseconds(map(motorPower.right * -1, -100, 100, 1000, 2000));
-
+    // delay(10);
 }
+
+void findBox(){
+    Speeds boxFindingSpeed;
+    float minSpeed = 30;
+    float minBoxDist, maxBoxDist, maxSeekDist;
+    minBoxDist = 150;
+    maxBoxDist = 200;
+    maxSeekDist = 300;
+    float fwdP = 0.1;
+    float distanceToGo;
+    float leftSensor, rightSensor, maxValidReading;
+    maxValidReading = 1000;
+    leftSensor = min(distances[2], maxValidReading);
+    rightSensor = min(distances[3], maxValidReading);
+    display.printf("left sensor: %4.0f", leftSensor);
+    display.println(" ");
+    display.printf("right sensor: %4.0f", rightSensor);
+    display.println(" ");
+
+    if ((leftSensor < maxSeekDist) || (rightSensor < maxSeekDist)) {
+        //something is within range of seeking
+        if ((leftSensor > minBoxDist) && (leftSensor < maxBoxDist) && (rightSensor > minBoxDist) && (rightSensor < maxBoxDist)){
+            //box is in range, stop
+            boxFindingSpeed = deadStop;
+            boxFinding = false;
+            display.println(F("in position"));
+            display.display();
+            setMotorSpeeds(boxFindingSpeed, motorLeft, motorRight);
+        } else {
+            if ((leftSensor < minBoxDist) || (rightSensor < minBoxDist)){
+                //box too close, back off
+                distanceToGo = minBoxDist - min(leftSensor, rightSensor);
+                distanceToGo = fwdP * distanceToGo;
+                display.printf("nudging back %3.0f", distanceToGo);
+                display.display();
+                nudge(false, false, distanceToGo);
+            } else {
+                float turnError;
+                float turnP = 0.04;
+                float turnLimit = 150;
+                turnError = leftSensor - rightSensor;
+                if (abs(turnError) < turnLimit){
+                    //box is nearly straight ahead
+                    distanceToGo = min(leftSensor, rightSensor) - maxBoxDist;
+                    display.printf("nudging forward %3.0f", distanceToGo);
+                    display.display();
+                    distanceToGo = fwdP * distanceToGo;
+                    nudge(true, true, distanceToGo);
+                } else {
+                    //box is within seek range but off centre, so turn towards it
+                    float turnDistance;
+                    turnDistance = abs(turnP * turnError);
+                    if (leftSensor < rightSensor) {
+                        display.printf("nudging left %3.0f", turnDistance);
+                        display.display();
+                        nudge(false,true,turnDistance);
+                    } else {
+                        display.printf("nudging right %3.0f", turnDistance);
+                        display.display();
+                        nudge(true,false,turnDistance);
+                    }
+                }
+            }
+        }
+    } else {
+        //no box found, keep going
+        boxFindingSpeed.left = minSpeed;
+        boxFindingSpeed.right = minSpeed;
+        display.println(F("looking for box"));
+        display.display();
+        setMotorSpeeds(boxFindingSpeed, motorLeft, motorRight);
+    }
+}
+
+
 
 void processMessage(SerialTransfer &transfer) {
     // use this variable to keep track of how many
@@ -894,9 +930,5 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
-    display.printf("sensor 2: %2.2f", distances[2]);
-    display.println(" ");
-    display.printf("sensor 3: %2.2f", distances[3]);
-    display.display();
 
 }
