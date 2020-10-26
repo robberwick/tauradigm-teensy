@@ -30,6 +30,11 @@ struct Speeds {
     float right = 0.0;
 };
 
+struct GitData {
+    char branch[21] = GIT_BRANCH;
+    char commit[8] = GIT_REV;
+};
+
 class Status {
    public:
     SensorData sensors;
@@ -50,6 +55,8 @@ class Status {
 
     OrientationReading orientation;
     OrientationReading previousOrientation;
+
+    GitData git;
 
    private:
     float _minBatVoltage = 11.1;

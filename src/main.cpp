@@ -494,15 +494,10 @@ void setup() {
     screen.showScreen();
     delay(3000);
 
-    pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 10);
-    screen.display.println("Git Branch:");
-    screen.display.println(GIT_BRANCH);
-    screen.display.println("Git commit hash:");
-    screen.display.println(GIT_REV);
-    screen.display.display();
+    screen.setMode(Screen::Mode::GIT_STATUS);
+    screen.showScreen();
     delay(2000);
+
     screen.display.clearDisplay();
     screen.display.setCursor(0, 10);
     screen.display.println("Press button now to  enter POST");
@@ -511,6 +506,8 @@ void setup() {
     screen.display.printf("%2.2f V", robotStatus.getBatteryVoltage());
     screen.display.display();
     delay(2000);
+
+    pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
     uint32_t buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
     bool enterPost = false;
     if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold) {

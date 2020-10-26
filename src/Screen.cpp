@@ -27,7 +27,10 @@ void Screen::setMode(Screen::Mode mode) {
 }
 
 void Screen::showScreen() {
+    // clear the display
     display.clearDisplay();
+    // invert the display if we're displaying the error screen
+    display.invertDisplay(_currentMode == Mode::ERROR);
     switch (_currentMode) {
         case Mode::POST_MOTORS:
             break;
@@ -57,6 +60,10 @@ void Screen::showScreen() {
             showStartup();
             break;
 
+        case Mode::GIT_STATUS:
+            showGitStatus();
+            break;
+
         case Mode::IMU:
             break;
 
@@ -68,14 +75,13 @@ void Screen::showScreen() {
 
         case Mode::ERROR:
             showError();
-
             break;
+            // flush changes to the display
     }
+    display.display();
 }
 
 void Screen::showError() {
-    bool shouldInvertDisplay = (_status.motorMessageCommsDown() || _status.batteryIsLow());
-    display.clearDisplay();
     display.setCursor(0, 0);
     if (_status.motorMessageCommsDown()) {
         display.printf("missed message %d", _status.missedMotorMessageCount);
@@ -86,9 +92,6 @@ void Screen::showError() {
         display.printf("low battery");
         display.println();
     }
-    display.display();
-
-    display.invertDisplay(shouldInvertDisplay);
 }
 
 void Screen::showStartup() {
@@ -96,5 +99,12 @@ void Screen::showStartup() {
         (display.width() - LOGO_WIDTH) / 2,
         (display.height() - LOGO_HEIGHT) / 2,
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-    display.display();
+}
+
+void Screen::showGitStatus() {
+    display.setCursor(0, 10);
+    display.println("Git Branch:");
+    display.println(_status.git.branch);
+    display.println("Git commit hash:");
+    display.println(_status.git.commit);
 }

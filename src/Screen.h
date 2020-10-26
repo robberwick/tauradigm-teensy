@@ -60,6 +60,7 @@ class Screen {
         POST_IMU_CALIBRATE,
         POST_IMU_CALIBRATION_COMPLETE,
         START_UP,
+        GIT_STATUS,
         IMU,
         SENSOR_DATA,
         TIMING,
@@ -81,6 +82,7 @@ class Screen {
     void showPostIMUCalibrate();
     void showPostIMUCalibrationComplete();
     void showStartup();
+    void showGitStatus();
     void showIMU();
     void showSensorData();
     void showTiming();
