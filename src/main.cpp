@@ -366,9 +366,40 @@ void findBox(){
         boxFindingSpeed.left = minSpeed;
         boxFindingSpeed.right = minSpeed;
         display.println(F("looking for box"));        
-    }
-    
+    }    
     setMotorSpeeds(boxFindingSpeed, motorLeft, motorRight);
+}
+
+void nudge(bool leftForward = true, bool rightForward = true, float minChange = 5) {
+    Speeds motorPower, direction;
+    float nudgePower = 20;       //determined from practical testing
+    
+    direction.left = leftForward ? 1 : -1;
+    direction.right = rightForward ? 1 : -1;
+    
+
+    //assign a small value that should be enough to move, but not quickly
+    motorPower.left = nudgePower * direction.left;
+    motorPower.right = nudgePower * direction.right;
+    motorLeft.writeMicroseconds(map(motorPower.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(motorPower.right * -1, -100, 100, 1000, 2000));
+
+    float change;
+    long encoderChange[NUM_ENCODERS];
+    while (change<minChange){
+        /// Read Encoder counts
+        for (u_int8_t n = 0; n < 3; n++) {
+            encoderChange[n] = encoders[n].read()-encoderReadings[n];
+        }
+        change = direction.left * (encoderChange[0]+encoderChange[1]+encoderChange[2]);
+        change -= direction.right * (encoderChange[3]+encoderChange[4]+encoderChange[5]);
+        delay(1);
+    }
+
+    motorPower = deadStop;
+    motorLeft.writeMicroseconds(map(motorPower.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(motorPower.right * -1, -100, 100, 1000, 2000));
+
 }
 
 void processMessage(SerialTransfer &transfer) {
