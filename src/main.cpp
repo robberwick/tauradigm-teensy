@@ -132,15 +132,9 @@ float batteryVoltage() {
     //AnalogRead returns 10bit fraction of Vdd
     adcReading = analogRead(TEENSY_PIN_BATT_SENSE) * 3.3 / 1023.0;
 
-<<<<<<< HEAD
      //ADC reads battery via a potential divider of 33k and 10k
      //but they're wrong/out of spec ((33+10)/10 = 4.3)
-    voltage = ADC * 3.71;
-=======
-    //ADC reads battery via a potential divider of 33k and 10k
-    //but they're wrong/outof spec
-    voltage = adcReading * (26.9 + 10.0) / 10.0 + 4;
->>>>>>> master
+    voltage = adcReading * 3.71;
     return voltage;
 }
 Speeds getWheelTravel() {
