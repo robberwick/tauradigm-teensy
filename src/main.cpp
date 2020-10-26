@@ -494,6 +494,26 @@ void setup() {
     screen.showScreen();
     delay(3000);
 
+    // Setup serial comms
+    // Show debug warning if debug flag is set
+#ifdef DEBUG
+    screen.display.clearDisplay();
+    screen.display.setCursor(0, 0);
+    screen.display.println(F("*** WARNING ***"));
+    screen.display.println("");
+    screen.display.println("Debug flag is set");
+    screen.display.println("Waiting for\nUSB serial");
+    screen.display.display();
+    delay(1000);
+    Serial.begin(115200);
+    while (!Serial) {
+    };
+#endif
+
+    Serial2.begin(1000000);
+    while (!Serial2) {
+    };
+
     screen.setMode(Screen::Mode::GIT_STATUS);
     screen.showScreen();
     delay(2000);
@@ -516,26 +536,6 @@ void setup() {
         screen.display.display();
         delay(500);
     }
-
-    // Setup serial comms
-    // Show debug warning if debug flag is set
-#ifdef DEBUG
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 0);
-    screen.display.println(F("*** WARNING ***"));
-    screen.display.println("");
-    screen.display.println("Debug flag is set");
-    screen.display.println("Waiting for\nUSB serial");
-    screen.display.display();
-    delay(1000);
-    Serial.begin(115200);
-    while (!Serial) {
-    };
-#endif
-
-    Serial2.begin(1000000);
-    while (!Serial2) {
-    };
 
     if (enterPost) {
         post();
