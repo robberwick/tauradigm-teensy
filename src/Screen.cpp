@@ -1,9 +1,25 @@
 #include "screen.h"
 
+#include <Arduino.h>
+
+#include "config.h"
+
 Screen::Screen(Status &status, uint8_t w, uint8_t h, TwoWire *twi,
                int8_t rst_pin, uint32_t clkDuring,
                uint32_t clkAfter) : _status(status) {
     display = Adafruit_SSD1306(w, h, twi, rst_pin, clkDuring, clkAfter);
+}
+
+bool Screen::initDisplay() {
+    if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
+        return false;
+    }
+    display.setTextSize(1);                              // Normal 1:1 pixel scale
+    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
+    display.setCursor(0, 0);                             // Start at top-left corner
+    display.cp437(true);                                 // Use full 256 char 'Code Page 437' font
+
+    return true;
 }
 
 void Screen::setMode(Screen::Mode mode) {
@@ -11,6 +27,7 @@ void Screen::setMode(Screen::Mode mode) {
 }
 
 void Screen::showScreen() {
+    display.clearDisplay();
     switch (_currentMode) {
         case Mode::POST_MOTORS:
             break;
@@ -37,6 +54,7 @@ void Screen::showScreen() {
             break;
 
         case Mode::START_UP:
+            showStartup();
             break;
 
         case Mode::IMU:
@@ -71,4 +89,12 @@ void Screen::showError() {
     display.display();
 
     display.invertDisplay(shouldInvertDisplay);
+}
+
+void Screen::showStartup() {
+    display.drawBitmap(
+        (display.width() - LOGO_WIDTH) / 2,
+        (display.height() - LOGO_HEIGHT) / 2,
+        logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+    display.display();
 }

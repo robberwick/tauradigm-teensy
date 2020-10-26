@@ -15,7 +15,6 @@
 #include "Wire.h"
 
 #include "config.h"
-#include "graphics.h"
 #include "screen.h"
 #include "status.h"
 
@@ -486,23 +485,13 @@ void setup() {
     Wire.begin(TEENSY_PIN_I2C_SDA, TEENSY_PIN_I2C_SCL);
 #endif
 
-    // Initalise display and show logo
-    if (!screen.display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDR)) {
-        // TODO show failure message on OLED
+    // Initalise display
+    if (!screen.initDisplay()) {
         haltAndCatchFire();
     }
-    screen.display.setTextSize(1);                              // Normal 1:1 pixel scale
-    screen.display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  // Draw white text
-    screen.display.setCursor(0, 0);                             // Start at top-left corner
-    screen.display.cp437(true);                                 // Use full 256 char 'Code Page 437' font
-
-    screen.display.clearDisplay();
-
-    screen.display.drawBitmap(
-        (screen.display.width() - LOGO_WIDTH) / 2,
-        (screen.display.height() - LOGO_HEIGHT) / 2,
-        logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-    screen.display.display();
+    // Show Splash Screen
+    screen.setMode(Screen::Mode::START_UP);
+    screen.showScreen();
     delay(3000);
 
     pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
