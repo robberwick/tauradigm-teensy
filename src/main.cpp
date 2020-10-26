@@ -39,7 +39,7 @@ struct Speeds {
     float right;
 };
 float averageSpeed;
-float minSpeed = 20;
+float minSpeed = 0.5;
 
 Speeds deadStop = {0, 0};
 
@@ -328,10 +328,10 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 void findBox(){
     Speeds boxFindingSpeed;
     float minSpeed = 28;
-    float turnSpeed = 15;
+    float turnSpeed = 25;
     float minBoxDist, maxBoxDist, maxSeekDist;
-    minBoxDist = 100;
-    maxBoxDist = 250;
+    minBoxDist = 150;
+    maxBoxDist = 200;
     maxSeekDist = 300;
     float leftSensor, rightSensor;
     leftSensor = distances[2];
@@ -351,8 +351,12 @@ void findBox(){
         float turnP = 0.01;
         turnError = leftSensor - rightSensor;
         turnSpeed = min(max(turnError * turnP, -turnSpeed), turnSpeed);
-        boxFindingSpeed.left = (minSpeed + turnSpeed);
-        boxFindingSpeed.right = (minSpeed - turnSpeed);
+        boxFindingSpeed.left = turnSpeed;
+        boxFindingSpeed.right = -turnSpeed;
+        if ((leftSensor > maxBoxDist) && (rightSensor > maxBoxDist)){
+            boxFindingSpeed.left += minSpeed;
+            boxFindingSpeed.right += minSpeed;
+        }
         if ((leftSensor < minBoxDist) && (rightSensor < minBoxDist)){
             boxFindingSpeed.left = -minSpeed;
             boxFindingSpeed.right = -minSpeed;
