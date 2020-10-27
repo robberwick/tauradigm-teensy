@@ -40,6 +40,9 @@ struct Speeds {
 };
 float averageSpeed;
 float minSpeed = 20;
+struct Pose waypoints[3];
+uint8_t currentWaypoint=0;
+bool navigating = false;
 
 Speeds deadStop = {0, 0};
 
@@ -323,6 +326,12 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
 
+void navigate(){
+    Speeds MotorSpeeds;
+    MotorSpeeds.left = MotorSpeeds.right = 30;
+    setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
+}
+
 void processMessage(SerialTransfer &transfer) {
     // use this variable to keep track of how many
     // bytes we've processed from the receive buffer
@@ -339,7 +348,9 @@ void processMessage(SerialTransfer &transfer) {
 //            transfer.rxObj(messages, sizeof(messages), sizeof(messageType));
 //            requestedMotorSpeeds = {messages[0], messages[1]};
             transfer.rxObj(requestedMotorSpeeds, recSize);
-            setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
+            if (!navigating){
+                setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
+            }
             // reset the missed motor mdessage count
             resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
@@ -390,10 +401,14 @@ void processMessage(SerialTransfer &transfer) {
                 case 'u':
                     display.println(F("navigating to next waypoint"));
                     display.display();
+                    currentWaypoint += 1;
+                    currentWaypoint = currentWaypoint % sizeof(waypoints);
+                    navigating=true;
                     break;
                 case 'd':
                     display.println(F("stopping navigation"));
                     display.display();
+                    navigating = false;
                     break;
             }
             break;
@@ -724,6 +739,12 @@ void setup() {
         display.display();
         delay(200);
     }
+    waypoints[0].x = 0;
+    waypoints[0].y = -50;
+    waypoints[1].x = 500;
+    waypoints[1].y = 0;
+    waypoints[2].x = 900;
+    waypoints[2].y = 0;
 }
 
 void loop() {
@@ -732,7 +753,9 @@ void loop() {
         processMessage(myTransfer);
     }
 
-
+    if (navigating) {
+        navigate();
+    }
     // if the message sending timeout has passed then increment the missed count
     // and reset
     if (receiveMessage.hasPassed(20)) {
