@@ -9,14 +9,19 @@
 #include <SerialTransfer.h>
 #include <Servo.h>
 #include <VL53L0X.h>
-#include <unordered_map>
 #include <utility/imumaths.h>
 
-#include "Wire.h"
+#include <unordered_map>
 
+#include "Wire.h"
 #include "config.h"
+#include "robot_hal.h"
 #include "screen.h"
 #include "status.h"
+#include "types.h"
+#include "utils.h"
+
+Status robotStatus = Status();
 
 // #define DEBUG
 
@@ -24,20 +29,7 @@
 HardwareSerial Serial2(USART2);
 #endif
 
-Servo motorLeft;
-Servo motorRight;
-
-float averageSpeed;
-float minSpeed = 20;
-
-Speeds deadStop = {0, 0};
-
-long lastLoopTime = millis();
-float loopTime = 0;
-
-float minBatVoltage = 11.1;
-float trackWidth = 136;
-float travelPerEncoderCount = 0.262;  //millimeters per encoder count. from testing
+RobotHal hal(robotStatus);
 
 SerialTransfer myTransfer;
 
@@ -45,7 +37,6 @@ Chrono receiveMessage;
 Chrono readSensors;
 VL53L0X sensor;
 
-// float distances[8];
 bool activeToFSensors[8];
 int16_t lightSensors[4];
 
@@ -56,8 +47,6 @@ Encoder encoders[NUM_ENCODERS] = {
     Encoder(TEENSY_PIN_ENC4A, TEENSY_PIN_ENC4B),
     Encoder(TEENSY_PIN_ENC5A, TEENSY_PIN_ENC5B),
     Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)};
-
-Status robotStatus = Status();
 
 Screen screen(robotStatus, 128, 64);
 
@@ -73,144 +62,7 @@ void tcaselect(uint8_t i) {
     Wire.endTransmission();
 }
 
-#define sgn(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
-
-float minMagnitude(float x, float y, float z) {
-    //function to find the smallest (closest to zero) value
-    // specifically, find the motor that is spinning slowest
-    // which is assumed to be the most representative of robot speed
-    float currentMin = x;
-    float currentMinMagnitude = abs(x);
-    if (abs(y) < currentMinMagnitude) {
-        currentMin = y;
-        currentMinMagnitude = abs(y);
-    }
-    if (abs(z) < currentMinMagnitude) {
-        currentMin = z;
-    }
-    return currentMin;
-}
-
-float wrapTwoPi(float angle) {
-    //wraps an angle to stay within +/-pi
-    while (angle > M_PI) angle -= TWO_PI;
-    while (angle < -M_PI) angle += TWO_PI;
-    return angle;
-}
-
-Speeds getWheelTravel() {
-    // Uses minimum encoder reading to estimate actual travel speed.
-    // returns a speed struct of wheel travel in mm
-
-    //compare old and latest encoder readings to see how much each wheel has rotated
-    float wheelTravel[NUM_ENCODERS];
-    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-        wheelTravel[n] = ((float)(robotStatus.sensors.encoders.current[n] - robotStatus.sensors.encoders.previous[n])) * travelPerEncoderCount;
-    }
-    //most representative speed assumed to be slowest wheel
-    //#0, #1 & #3 is left,  #3, #4 & #5 is right
-    //#0 is front left     #3 is front right
-    //#1 is rear left      #4 is middle right
-    //#2 is middle left    #5 is rear right
-    Speeds travel;
-    travel.right = minMagnitude(wheelTravel[3], wheelTravel[4], wheelTravel[5]);
-    travel.left = minMagnitude(wheelTravel[0], wheelTravel[1], wheelTravel[2]);
-    return travel;
-}
-float getDistanceTravelled() {
-    //returns the average distance travelled by right and left wheels, in mm
-    Speeds travel = getWheelTravel();
-    return (travel.left - travel.right) / 2;
-}
-
-struct Speeds feedForward(struct Speeds targetSpeeds) {
-    // takes two speed commands in mm/sec
-    // returns predicted motor power -100 to +100%
-    //inputs and outputs both Speed structs
-
-    struct Speeds commandSpeeds;
-
-    float minTurnPower = 4;       //determined from practical testing
-    float minForwardPower = 5;     //same
-    float powerCoefficient = 50;  //same
-    float turnThreshold = 100;     //units: mm/sec. arbitary, value.
-    // using the turnThreshold does create a discontinuity when transitioning
-    // from mostly straight ahead to a slight turn but then the two moves
-    // do need different power outputs. maybe linear interpolation between
-    // the two would be better?
-
-    // since there's a min power needed to move (as defined above)
-    // first check if we're trying to move
-    if (targetSpeeds.left != 0 and targetSpeeds.right != 0) {
-        //then check if we're trying to turn or not, i.e. left and right speeds different
-        if (abs(targetSpeeds.right - targetSpeeds.left) > turnThreshold) {
-            //then predict power needed to acheive that speed. formule derived from curve fitting experimental results
-            float turnComponent = sgn(targetSpeeds.right - targetSpeeds.left) * (abs(targetSpeeds.right - targetSpeeds.left) / powerCoefficient + minTurnPower);
-            float forwardComponent = (targetSpeeds.right + targetSpeeds.left) / 2 / powerCoefficient;
-            commandSpeeds.right = turnComponent + forwardComponent;
-            commandSpeeds.left = -turnComponent + forwardComponent;
-        } else {
-            //a different formula is best fit for going straight
-            commandSpeeds.right = sgn(targetSpeeds.right) * (abs(targetSpeeds.right) / powerCoefficient + minForwardPower);
-            commandSpeeds.left = sgn(targetSpeeds.left) * (abs(targetSpeeds.left) / powerCoefficient + minForwardPower);
-        }
-    } else {
-        //if we're not trying to move, turn the motors off
-        commandSpeeds.right = 0;
-        commandSpeeds.left = 0;
-    }
-    return commandSpeeds;
-}
-
-struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
-    // apply PID
-    // takes two speed commands in -100 to +100 and two
-    // target speeds in mm/sec
-    // uses sensor feedback to correct for errors
-    // returns motor power -100 to +100%
-    //inputs and outputs all Speed structs
-
-    // or at the moment, just proportional
-    //. i.e power percentage proporational to difference
-    // between desired speed and current actual wheel speed
-
-    float loopTime = (millis() - lastLoopTime) / 1000.0;  // divide by 1000 converts to seconds.
-    lastLoopTime = millis();
-
-    //work out target turn rate
-    float targetTurnRate = (targetSpeeds.left - targetSpeeds.right) / trackWidth;
-
-    //compare old and latest encoder readings to see how much each wheel has rotated
-    //speed is distance/time and should be a float in mm/sec
-    Speeds travel = getWheelTravel();
-    Speeds actualMotorSpeeds;
-    actualMotorSpeeds.right = travel.right/loopTime;
-    actualMotorSpeeds.left = travel.left/loopTime;
-
-    //work out actual turn rate
-    // TODO - do this in the status obj? How to get loop time?
-    float actualTurnRate = wrapTwoPi(robotStatus.orientation.x - robotStatus.previousOrientation.x) / loopTime;
-
-    // do actual Proportional calc.
-    //speed error is target - actual.
-    float fwdKp = 0.01;  //ie. how much power to use for a given speed error
-    commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
-    commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
-    float turnKp = 2;
-    float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
-    commandSpeeds.left += steeringCorrection;
-    commandSpeeds.right -= steeringCorrection;
-
-    //constrain output
-    float max_power = 65;
-    commandSpeeds.left = max(min(commandSpeeds.left, max_power), -max_power);
-    commandSpeeds.right = max(min(commandSpeeds.right, max_power), -max_power);
-
-    return commandSpeeds;
-}
-
-void
-haltAndCatchFire() {
+void haltAndCatchFire() {
     while (1) {
     }
 }
@@ -236,40 +88,6 @@ void do_i2c_scan() {
     delay(4000);
 }
 
-void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorRight) {
-    Speeds commandMotorSpeeds, targetMotorSpeeds;
-
-    //convert -100 - +100 percentage speed command into mm/sec
-    // for autonomous control we could revert back to using full scale
-    // but for manual control, and for testing speedcontrol precision
-    // better to start with limiting to lower speeds
-    float maxspeed_mm_per_sec = 1000;  //max acheivable is ~3200
-    targetMotorSpeeds.right = requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
-    targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
-
-    //convert speed commands into predicted power
-    // otherwise known as feedforward. We can do feedforward
-    // and/or PID speed control. both is better but either
-    // alone gives functional results
-
-    //get predicted motor powers from feedforward
-    commandMotorSpeeds = feedForward(targetMotorSpeeds);
-
-    // check if the command speed has been close to zero for a while
-    averageSpeed = 0.5 * averageSpeed + 0.5 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
-
-    //if its been zero for a while, just stop, else work out the PID modified speeds
-    if (averageSpeed < minSpeed) {
-        commandMotorSpeeds = deadStop;
-    } else {
-        //apply PID to motor powers based on deviation from target speed
-        commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
-    }
-
-    motorLeft.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
-    motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
-}
-
 void processMessage(SerialTransfer &transfer) {
     // use this variable to keep track of how many
     // bytes we've processed from the receive buffer
@@ -284,7 +102,7 @@ void processMessage(SerialTransfer &transfer) {
         default:
             Speeds requestedMotorSpeeds;
             transfer.rxObj(requestedMotorSpeeds, recSize);
-            setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
+            hal.setMotorSpeeds(requestedMotorSpeeds);
             // reset the missed motor mdessage count
             robotStatus.resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
@@ -301,8 +119,9 @@ void post() {
     screen.display.setCursor(0, 0);
     screen.display.println(F("Motors"));
     screen.display.display();
-    motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
-    motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
+    // init motors
+    hal.initialiseMotors();
+
     screen.display.setCursor(0, 10);
     screen.display.print("OK");
     screen.display.display();
@@ -535,12 +354,8 @@ void setup() {
     if (enterPost) {
         post();
     } else {
-        // Attach motors
-        motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
-        motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
-
-        // Set motors to stop
-        setMotorSpeeds(deadStop, motorLeft, motorRight);
+        // Initialise motors
+        hal.initialiseMotors();
 
         // Initialise serial transfer
         myTransfer.begin(Serial2);
@@ -618,7 +433,7 @@ void loop() {
         screen.showScreen();
 
         // Set motors to dead stop
-        setMotorSpeeds(deadStop, motorLeft, motorRight);
+        hal.stopMotors();
     }
 
     if (readSensors.hasPassed(10)) {
@@ -651,7 +466,8 @@ void loop() {
         uint16_t payloadSize = 0;
 
         //update odometry
-        float distanceMoved = getDistanceTravelled();
+        // float distanceMoved = getDistanceTravelled();
+        float distanceMoved = hal.getDistanceTravelled();
         // Update pose based on current heading and distance moved
         // ensure that the orientation data has been updated first
         // TODO tidy this up
