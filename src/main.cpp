@@ -59,9 +59,6 @@ Encoder encoders[NUM_ENCODERS] = {
     Encoder(TEENSY_PIN_ENC5A, TEENSY_PIN_ENC5B),
     Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)};
 
-long encoderReadings[NUM_ENCODERS];
-long oldEncoderReadings[NUM_ENCODERS];
-
 Status robotStatus = Status();
 
 Screen screen(robotStatus, 128, 64);
