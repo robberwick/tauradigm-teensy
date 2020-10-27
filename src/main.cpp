@@ -328,40 +328,37 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 void findBox(){
     Speeds boxFindingSpeed;
     float minSpeed = 28;
-    float turnSpeed = 25;
-    float minBoxDist, maxBoxDist, maxSeekDist;
-    minBoxDist = 150;
-    maxBoxDist = 200;
+    float turnSpeed = 15;
+    float maxBoxDist, maxSeekDist;
+    maxBoxDist = 170;
     maxSeekDist = 300;
     float leftSensor, rightSensor;
     leftSensor = distances[2];
     rightSensor = distances[3];
+    display.printf("left sensor: %4.0f", leftSensor);
+    display.println(" ");
+    display.printf("right sensor: %4.0f", rightSensor);
+    display.println(" ");
     if ((leftSensor < maxSeekDist) || (rightSensor < maxSeekDist)) {
-        if ((leftSensor > minBoxDist) && (leftSensor < maxBoxDist) && (rightSensor > minBoxDist) && (rightSensor < maxBoxDist)){
+        if ((leftSensor < maxBoxDist) && (rightSensor < maxBoxDist)){
             boxFindingSpeed = deadStop;
             boxFinding = false;
             display.println(F("in position"));
-        }
-        if (leftSensor < rightSensor) {
-            display.println(F("turning left"));
-        } else {
-            display.println(F("turning right"));
+            display.display();
+            return;
         }
         float turnError;
         float turnP = 0.01;
         turnError = leftSensor - rightSensor;
         turnSpeed = min(max(turnError * turnP, -turnSpeed), turnSpeed);
-        boxFindingSpeed.left = turnSpeed;
-        boxFindingSpeed.right = -turnSpeed;
-        if ((leftSensor > maxBoxDist) && (rightSensor > maxBoxDist)){
-            boxFindingSpeed.left += minSpeed;
-            boxFindingSpeed.right += minSpeed;
+        boxFindingSpeed.left = minSpeed + turnSpeed;
+        boxFindingSpeed.right = minSpeed - turnSpeed;
+        if (leftSensor < rightSensor) {
+            display.printf("turning left %3.0f", turnSpeed);
+        } else {
+            display.printf("turning right %3.0f", turnSpeed);
         }
-        if ((leftSensor < minBoxDist) && (rightSensor < minBoxDist)){
-            boxFindingSpeed.left = -minSpeed;
-            boxFindingSpeed.right = -minSpeed;
-            display.println(F("reversing"));
-        }
+        display.display();
     } else {
         boxFindingSpeed.left = minSpeed;
         boxFindingSpeed.right = minSpeed;
