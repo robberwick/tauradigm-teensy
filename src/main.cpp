@@ -122,14 +122,9 @@ void post() {
     delay(500);
 
     // Initialise serial transfer
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 0);
-    screen.display.println(F("Serial transfer"));
-
-    screen.display.display();
-    screen.display.print("OK");
+    screen.setMode(Screen::Mode::POST_SERIAL);
     myTransfer.begin(Serial2);
-    screen.display.display();
+    screen.showScreen();
     delay(500);
 
     // Initialise ToF sensors

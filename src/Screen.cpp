@@ -41,6 +41,7 @@ void Screen::showScreen() {
             break;
 
         case Mode::POST_SERIAL:
+            showPostSerial();
             break;
 
         case Mode::POST_TOF:
@@ -128,4 +129,11 @@ void Screen::showPrePost() {
     display.println();
     display.println("Battery Voltage:");
     display.printf("%2.2f V", _status.getBatteryVoltage());
+}
+
+void Screen::showPostSerial() {
+    display.setCursor(0, 0);
+    display.println("Serial transfer");
+
+    display.print("OK");
 }
