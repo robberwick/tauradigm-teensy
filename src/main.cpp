@@ -326,13 +326,8 @@ void setup() {
     screen.showScreen();
     delay(2000);
 
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 10);
-    screen.display.println("Press button now to enter POST");
-    screen.display.println();
-    screen.display.println("Battery Voltage:");
-    screen.display.printf("%2.2f V", robotStatus.getBatteryVoltage());
-    screen.display.display();
+    screen.setMode(Screen::Mode::PRE_POST);
+    screen.showScreen();
     delay(2000);
 
     pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);

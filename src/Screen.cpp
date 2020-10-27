@@ -32,6 +32,10 @@ void Screen::showScreen() {
     // invert the display if we're displaying the error screen
     display.invertDisplay(_currentMode == Mode::ERROR);
     switch (_currentMode) {
+        case Mode::PRE_POST:
+            showPrePost();
+            break;
+
         case Mode::POST_MOTORS:
             showPostMotors();
             break;
@@ -115,4 +119,13 @@ void Screen::showPostMotors() {
     display.println("Motors");
     display.setCursor(0, 10);
     display.print("OK");
+}
+
+void Screen::showPrePost() {
+    display.setCursor(0, 10);
+    display.println("Press button now");
+    display.println("to enter POST");
+    display.println();
+    display.println("Battery Voltage:");
+    display.printf("%2.2f V", _status.getBatteryVoltage());
 }
