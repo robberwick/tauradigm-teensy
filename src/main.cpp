@@ -40,7 +40,7 @@ struct Speeds {
     float right;
 };
 float averageSpeed;
-float minSpeed = 20;
+float minSpeed = 1;
 struct Pose waypoints[3];
 uint8_t currentWaypoint=0;
 bool navigating = false;
@@ -332,6 +332,7 @@ float distanceToWaypoint(Pose target, Pose current){
     float distance;
     //hypotenuse of dx, dy triangle gives distance, using h^2=x^2+y^2
     distance = sqrt(powf((target.x-current.x),2) + powf((target.y-current.y),2));
+    display.println(" ");
     display.printf("distance: %2.2f", distance);
     return distance;
 }
@@ -352,11 +353,21 @@ float headingToWaypoint(Pose target, Pose current){
 
 void navigate(){
     Speeds MotorSpeeds;
-    if (distanceToWaypoint(waypoints[2], currentPosition) < 300) {   
+    float positionTolerance = 100;
+    Pose targetWaypoint = waypoints[2];
+    if (distanceToWaypoint(targetWaypoint, currentPosition) < positionTolerance) {   
         MotorSpeeds.left = MotorSpeeds.right = 0;
         navigating = false;
     } else {
         MotorSpeeds.left = MotorSpeeds.right = 30;
+        float turnP = 20;
+        float headingError = headingToWaypoint(targetWaypoint, currentPosition);
+        display.println(" ");
+        display.printf("heading: %2.2f", headingError);
+        display.display();
+        float turnSpeed = turnP * headingError;
+        MotorSpeeds.left+=turnSpeed;
+        MotorSpeeds.right-=turnSpeed;
     }
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
 }
@@ -781,6 +792,12 @@ void loop() {
     if (myTransfer.available()) {
         processMessage(myTransfer);
     }
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.printf("heading: %2.2f", currentPosition.heading);
+    display.println(" ");
+    display.printf("position: %2.0f, %2.0f", currentPosition.x, currentPosition.y);
+    display.display();
 
     if (navigating) {
         navigate();
@@ -795,9 +812,7 @@ void loop() {
     bool shouldInvertDisplay = false;
     // Have we missed 10 valid motor messages?
 
-    display.clearDisplay();
-    display.setCursor(0, 0);
-
+    
     if (missedMotorMessageCount >= 10) {
         shouldInvertDisplay = true;
         display.printf("missed message %d", missedMotorMessageCount);
@@ -872,9 +887,5 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
-    display.printf("heading: %2.2f", currentPosition.heading);
-    display.println(" ");
-    display.printf("position: %2.0f, %2.0f", currentPosition.x, currentPosition.y);
-    display.display();
 
 }
