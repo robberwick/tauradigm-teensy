@@ -33,7 +33,7 @@ struct Pose {
     float x;
     float y;
 } currentPosition, previousPosition;
-
+float headingOffset=0;
 struct Speeds {
     float left;
     float right;
@@ -372,6 +372,28 @@ void processMessage(SerialTransfer &transfer) {
                     display.println(F("jaw up"));
                     display.display();
                     delay(200);
+                    break;
+                case 'l':
+                    display.println(F("zeroing heading"));
+                    display.display();
+                    delay(500);
+                    headingOffset = orientationReading.x;
+                    currentPosition.heading=0;
+                    break;
+                case 'r':
+                    display.println(F("zeroing odometry"));
+                    display.display();
+                    delay(500);
+                    currentPosition.x=0;
+                    currentPosition.y=0;
+                    break;
+                case 'u':
+                    display.println(F("navigating to next waypoint"));
+                    display.display();
+                    break;
+                case 'd':
+                    display.println(F("stopping navigation"));
+                    display.display();
                     break;
             }
             break;
@@ -780,7 +802,8 @@ void loop() {
         //update odometry
         previousPosition = currentPosition;
         float distanceMoved = getDistanceTravelled();
-        currentPosition = updatePose(previousPosition, orientationReading.x, distanceMoved);
+        float relativeHeading = orientationReading.x - headingOffset;
+        currentPosition = updatePose(previousPosition, relativeHeading, distanceMoved);
 
         // Prepare the distance data
         payloadSize = myTransfer.txObj(distances, payloadSize);
@@ -797,9 +820,9 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
-    display.printf("sensor2: %2.2f", distances[2]);
+    display.printf("heading: %2.2f", currentPosition.heading);
     display.println(" ");
-    display.printf("sensor 3: %2.2f", distances[3]);
+    display.printf("position: %2.0f, %2.0f", currentPosition.x, currentPosition.y);
     display.display();
 
 }
