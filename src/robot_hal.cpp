@@ -41,7 +41,7 @@ void RobotHal::setMotorSpeeds(Speeds requestedMotorSpeeds) {
     _status.averageSpeed = 0.5 * _status.averageSpeed + 0.5 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
 
     //if its been zero for a while, just stop, else work out the PID modified speeds
-    if (_status.averageSpeed < -_minSpeed) {
+    if (_status.averageSpeed < _minSpeed) {
         commandMotorSpeeds = _deadStop;
     } else {
         //apply PID to motor powers based on deviation from target speed
