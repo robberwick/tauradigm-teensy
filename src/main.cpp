@@ -330,14 +330,20 @@ void findBox(){
     float minSpeed = 28;
     float turnSpeed = 15;
     float maxBoxDist, maxSeekDist;
-    maxBoxDist = 170;
+    maxBoxDist = 180;
     maxSeekDist = 300;
-    float leftSensor, rightSensor;
+    float leftSensor, rightSensor, farLeftSensor, farRightSensor;  //beware of Nazi risk!
     leftSensor = distances[2];
     rightSensor = distances[3];
+    farLeftSensor = distances[0];
+    farRightSensor = distances[4];
+    display.printf("far left sensor: %4.0f", farLeftSensor);
+    display.println(" ");
     display.printf("left sensor: %4.0f", leftSensor);
     display.println(" ");
     display.printf("right sensor: %4.0f", rightSensor);
+    display.println(" ");
+    display.printf("far right sensor: %4.0f", farRightSensor);
     display.println(" ");
     if ((leftSensor < maxSeekDist) || (rightSensor < maxSeekDist)) {
         if ((leftSensor < maxBoxDist) && (rightSensor < maxBoxDist)){
@@ -860,9 +866,14 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
-    display.printf("sensor 2: %2.2f", distances[2]);
+    display.printf("far left sensor:%4.0f", distances[0]);
     display.println(" ");
-    display.printf("sensor 3: %2.2f", distances[3]);
+    display.printf("left sensor:     %4.0f", distances[2]);
+    display.println(" ");
+    display.printf("right sensor:    %4.0f", distances[3]);
+    display.println(" ");
+    display.printf("far right sensor:%4.0f", distances[4]);
+    display.println(" ");
     display.display();
 
 }
