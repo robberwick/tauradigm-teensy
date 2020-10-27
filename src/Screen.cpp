@@ -33,6 +33,7 @@ void Screen::showScreen() {
     display.invertDisplay(_currentMode == Mode::ERROR);
     switch (_currentMode) {
         case Mode::POST_MOTORS:
+            showPostMotors();
             break;
 
         case Mode::POST_SERIAL:
@@ -107,4 +108,11 @@ void Screen::showGitStatus() {
     display.println(_status.git.branch);
     display.println("Git commit hash:");
     display.println(_status.git.commit);
+}
+
+void Screen::showPostMotors() {
+    display.setCursor(0, 0);
+    display.println("Motors");
+    display.setCursor(0, 10);
+    display.print("OK");
 }

@@ -115,16 +115,10 @@ void post() {
     do_i2c_scan();
 
     // Attach motors
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 0);
-    screen.display.println(F("Motors"));
-    screen.display.display();
     // init motors
     hal.initialiseMotors();
-
-    screen.display.setCursor(0, 10);
-    screen.display.print("OK");
-    screen.display.display();
+    screen.setMode(Screen::Mode::POST_MOTORS);
+    screen.showScreen();
     delay(500);
 
     // Initialise serial transfer
