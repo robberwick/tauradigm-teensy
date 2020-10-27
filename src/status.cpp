@@ -44,8 +44,8 @@ Pose Status::updatePose(float heading, float distanceTravelled) {
 }
 
 void Status::updateOrientation(sensors_event_t orientationData) {
-    previousOrientation = sensors.orientation;
-    sensors.orientation.x = radians(orientationData.orientation.x);
-    sensors.orientation.y = radians(orientationData.orientation.y);
-    sensors.orientation.z = radians(orientationData.orientation.z);
+    previousOrientation = orientation;
+    orientation.x = radians(orientationData.orientation.x);
+    orientation.y = radians(orientationData.orientation.y);
+    orientation.z = radians(orientationData.orientation.z);
 }
