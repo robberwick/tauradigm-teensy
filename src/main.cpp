@@ -10,6 +10,7 @@
 #include <Servo.h>
 #include <VL53L0X.h>
 #include <utility/imumaths.h>
+#include <math.h>
 
 #include <unordered_map>
 
@@ -326,9 +327,37 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
 
+float distanceToWaypoint(Pose target, Pose current){
+    //returns distance 'as the crow flies' to the target pose 
+    float distance;
+    //hypotenuse of dx, dy triangle gives distance, using h^2=x^2+y^2
+    distance = sqrt(powf((target.x-current.x),2) + powf((target.y-current.y),2));
+    display.printf("distance: %2.2f", distance);
+    return distance;
+}
+
+float headingToWaypoint(Pose target, Pose current){
+    float dx, dy, relativeHeading;
+    dx = target.x-current.x;
+    dy = target.y-current.y;
+    if (dy != 0) {
+        relativeHeading = (float) atan2(dy, dx);
+    } else {
+        relativeHeading = sgn(dy) * M_PI/2;
+    }
+    relativeHeading = wrapTwoPi(relativeHeading - current.heading);
+
+    return relativeHeading;
+}
+
 void navigate(){
     Speeds MotorSpeeds;
-    MotorSpeeds.left = MotorSpeeds.right = 30;
+    if (distanceToWaypoint(waypoints[2], currentPosition) < 300) {   
+        MotorSpeeds.left = MotorSpeeds.right = 0;
+        navigating = false;
+    } else {
+        MotorSpeeds.left = MotorSpeeds.right = 30;
+    }
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
 }
 
