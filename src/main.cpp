@@ -35,9 +35,8 @@ SerialTransfer myTransfer;
 
 Chrono receiveMessage;
 Chrono readSensors;
-VL53L0X sensor;
 
-bool activeToFSensors[8];
+// bool activeToFSensors[8];
 int16_t lightSensors[4];
 
 Encoder encoders[NUM_ENCODERS] = {
@@ -51,16 +50,6 @@ Encoder encoders[NUM_ENCODERS] = {
 Screen screen(robotStatus, 128, 64);
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
-
-void tcaselect(uint8_t i) {
-    if (i > 7) {
-        return;
-    }
-
-    Wire.beginTransmission(TCA_ADDR);
-    Wire.write(1 << i);
-    Wire.endTransmission();
-}
 
 void haltAndCatchFire() {
     while (1) {
@@ -128,46 +117,10 @@ void post() {
     delay(500);
 
     // Initialise ToF sensors
-    tcaselect(0);
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 0);
-    screen.display.println(F("ToF sensors"));
-    screen.display.display();
-    for (uint8_t t = 0; t < 8; t++) {
-        tcaselect(t);
-        screen.display.printf("initialising %d", t);
-        screen.display.display();
-        activeToFSensors[t] = sensor.init();
-        screen.display.setCursor(0, screen.display.getCursorY() + 1);
-        screen.display.printf("init %d done", t);
-
-        if (activeToFSensors[t]) {
-            screen.display.printf("%d: OK", t);
-            sensor.setMeasurementTimingBudget(33000);
-            // lower the return signal rate limit (default is 0.25 MCPS)
-            sensor.setSignalRateLimit(0.1);
-            // increase laser pulse periods (defaults are 14 and 10 PCLKs)
-            sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
-            sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
-            // Start continuous back-to-back mode (take readings as
-            // fast as possible).  To use continuous timed mode
-            // instead, provide a desired inter-measurement period in
-            // ms (e.g. sensor.startContinuous(100)).
-            sensor.startContinuous();
-        } else {
-            screen.display.printf("%d: FAIL", t);
-        }
-        if (t % 2 == 1) {
-            screen.display.println("");
-        } else {
-            screen.display.setCursor(64, screen.display.getCursorY());
-        }
-        screen.display.display();
-        delay(50);
-    }
-    delay(500);
-    screen.display.clearDisplay();
-    screen.display.display();
+    hal.initialiseTOFSensors();
+    screen.setMode(Screen::Mode::POST_TOF);
+    screen.showScreen();
+    delay(4000);
 
     // //initialise IMU
     screen.display.clearDisplay();
@@ -345,24 +298,7 @@ void setup() {
         myTransfer.begin(Serial2);
 
         // Initialise ToF sensors
-        tcaselect(0);
-        for (uint8_t t = 0; t < 8; t++) {
-            tcaselect(t);
-            activeToFSensors[t] = sensor.init();
-            if (activeToFSensors[t]) {
-                sensor.setMeasurementTimingBudget(33000);
-                // lower the return signal rate limit (default is 0.25 MCPS)
-                sensor.setSignalRateLimit(0.1);
-                // increase laser pulse periods (defaults are 14 and 10 PCLKs)
-                sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
-                sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
-                // Start continuous back-to-back mode (take readings as
-                // fast as possible).  To use continuous timed mode
-                // instead, provide a desired inter-measurement period in
-                // ms (e.g. sensor.startContinuous(100)).
-                sensor.startContinuous();
-            }
-        }
+        hal.initialiseTOFSensors();
 
         // //initialise IMU
         screen.display.clearDisplay();
@@ -422,18 +358,9 @@ void loop() {
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
-        // Iterate through ToF sensors and attempt to get reading
-        for (uint8_t t = 0; t < 8; t++) {
-            tcaselect(t);
-            if (activeToFSensors[t]) {
-                robotStatus.sensors.tofDistances[t] = sensor.readRangeContinuousMillimeters();
-                if (sensor.timeoutOccurred()) {
-                    robotStatus.sensors.tofDistances[t] = 0;
-                }
-            } else {
-                robotStatus.sensors.tofDistances[t] = 0;
-            }
-        }
+
+        // update TOF sensor readings
+        hal.updateTOFSensors();
 
         /// Read Encoder counts
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
@@ -441,8 +368,7 @@ void loop() {
             robotStatus.sensors.encoders.current[n] = encoders[n].read();
         }
 
-        // Read IMU
-        // Update orientation status
+        // Update orientation status from IMU
         sensors_event_t orientationData;
         bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
         robotStatus.updateOrientation(orientationData);
@@ -450,7 +376,6 @@ void loop() {
         uint16_t payloadSize = 0;
 
         //update odometry
-        // float distanceMoved = getDistanceTravelled();
         float distanceMoved = hal.getDistanceTravelled();
         // Update pose based on current heading and distance moved
         // ensure that the orientation data has been updated first

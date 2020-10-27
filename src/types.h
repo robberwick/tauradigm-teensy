@@ -21,6 +21,10 @@ struct SensorData {
     float tofDistances[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 };
 
+struct ActivationStatus {
+    bool tofSensors[8] = {false, false, false, false, false, false, false, false};
+};
+
 struct Speeds {
     float left = 0.0;
     float right = 0.0;

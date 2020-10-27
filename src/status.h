@@ -8,6 +8,7 @@
 
 class Status {
    public:
+    ActivationStatus activation;
     SensorData sensors;
     Speeds speed;
     float averageSpeed;

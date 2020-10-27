@@ -1,10 +1,12 @@
 #include "robot_hal.h"
 
+#include <VL53L0X.h>
+
 #include "config.h"
 #include "types.h"
 #include "utils.h"
 
-RobotHal::RobotHal(Status &status) : _status(status){};
+RobotHal::RobotHal(Status &status, TwoWire *twi) : _status(status), wire(twi ? twi : &Wire){};
 
 bool RobotHal::initialiseMotors() {
     // attach motors and set to dead stop
@@ -164,4 +166,51 @@ float RobotHal::getDistanceTravelled() {
     //returns the average distance travelled by right and left wheels, in mm
     Speeds travel = getWheelTravel();
     return (travel.left - travel.right) / 2;
+}
+
+void RobotHal::initialiseTOFSensors() {
+    for (uint8_t t = 0; t < 8; t++) {
+        tcaselect(t);
+        bool sensorActivated = sensor.init();
+        _status.activation.tofSensors[t] = sensorActivated;
+
+        if (sensorActivated) {
+            sensor.setMeasurementTimingBudget(33000);
+            // lower the return signal rate limit (default is 0.25 MCPS)
+            sensor.setSignalRateLimit(0.1);
+            // increase laser pulse periods (defaults are 14 and 10 PCLKs)
+            sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
+            sensor.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
+            // Start continuous back-to-back mode (take readings as
+            // fast as possible).  To use continuous timed mode
+            // instead, provide a desired inter-measurement period in
+            // ms (e.g. sensor.startContinuous(100)).
+            sensor.startContinuous();
+        }
+    }
+}
+
+void RobotHal::updateTOFSensors() {
+    // Iterate through ToF sensors and attempt to get reading
+    for (uint8_t t = 0; t < 8; t++) {
+        tcaselect(t);
+        if (_status.activation.tofSensors[t]) {
+            _status.sensors.tofDistances[t] = sensor.readRangeContinuousMillimeters();
+            // TODO we should aim to keep this timeout to a minimum - flag occurrences?
+            if (sensor.timeoutOccurred()) {
+                _status.sensors.tofDistances[t] = 0;
+            }
+        } else {
+            _status.sensors.tofDistances[t] = 0;
+        }
+    }
+}
+
+void RobotHal::tcaselect(uint8_t i) {
+    if (i > 7) {
+        return;
+    }
+    wire->beginTransmission(TCA_ADDR);
+    wire->write(1 << i);
+    wire->endTransmission();
 }

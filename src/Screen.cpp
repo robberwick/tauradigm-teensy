@@ -31,6 +31,9 @@ void Screen::showScreen() {
     display.clearDisplay();
     // invert the display if we're displaying the error screen
     display.invertDisplay(_currentMode == Mode::ERROR);
+
+    display.setCursor(0, 0);
+
     switch (_currentMode) {
         case Mode::PRE_POST:
             showPrePost();
@@ -45,6 +48,7 @@ void Screen::showScreen() {
             break;
 
         case Mode::POST_TOF:
+            showPostTOF();
             break;
 
         case Mode::POST_ADC:
@@ -136,4 +140,21 @@ void Screen::showPostSerial() {
     display.println("Serial transfer");
 
     display.print("OK");
+}
+
+void Screen::showPostTOF() {
+    display.setCursor(0, 0);
+    display.println("ToF sensors");
+    for (uint8_t t = 0; t < 8; t++) {
+        if (_status.activation.tofSensors[t]) {
+            display.printf("%d: OK", t);
+        } else {
+            display.printf("%d: FAIL", t);
+        }
+        if (t % 2 == 1) {
+            display.println("");
+        } else {
+            display.setCursor(64, display.getCursorY());
+        }
+    }
 }
