@@ -19,7 +19,6 @@ struct SensorData {
         long current[6] = {0, 0, 0, 0, 0, 0};
     } encoders;
     float tofDistances[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    OrientationReading orientation;
 };
 
 struct Speeds {
