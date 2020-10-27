@@ -41,8 +41,6 @@ float travelPerEncoderCount = 0.262;  //millimeters per encoder count. from test
 
 SerialTransfer myTransfer;
 
-int8_t step = 1;
-
 Chrono receiveMessage;
 Chrono readSensors;
 VL53L0X sensor;
