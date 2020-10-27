@@ -14,7 +14,7 @@ class RobotHal {
         Servo right;
     } motors;
 
-    void initialiseMotors();
+    bool initialiseMotors();
     void stopMotors();
     void setMotorSpeeds(Speeds requestedMotorSpeeds);
     Speeds getWheelTravel();

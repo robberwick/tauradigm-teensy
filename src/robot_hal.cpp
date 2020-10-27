@@ -6,11 +6,12 @@
 
 RobotHal::RobotHal(Status &status) : _status(status){};
 
-void RobotHal::initialiseMotors() {
+bool RobotHal::initialiseMotors() {
     // attach motors and set to dead stop
     motors.left.attach(TEENSY_PIN_DRIVE_LEFT);
     motors.right.attach(TEENSY_PIN_DRIVE_RIGHT);
     stopMotors();
+    return true;
 };
 
 void RobotHal::stopMotors() {
