@@ -1,12 +1,15 @@
 #include "robot_hal.h"
 
+#include <EEPROM.h>
 #include <VL53L0X.h>
 
 #include "config.h"
 #include "types.h"
 #include "utils.h"
 
-RobotHal::RobotHal(Status &status, TwoWire *twi) : _status(status), wire(twi ? twi : &Wire){};
+RobotHal::RobotHal(Status &status, TwoWire *twi) : _status(status), wire(twi ? twi : &Wire) {
+    bno = Adafruit_BNO055(55, IMU_ADDR, wire);
+};
 
 bool RobotHal::initialiseMotors() {
     // attach motors and set to dead stop
@@ -213,4 +216,76 @@ void RobotHal::tcaselect(uint8_t i) {
     wire->beginTransmission(TCA_ADDR);
     wire->write(1 << i);
     wire->endTransmission();
+}
+
+void RobotHal::initialiseIMU() {
+    _status.activation.imu = bno.begin();
+};
+
+bool RobotHal::calibrateIMU() {
+    bno.getCalibration(
+        &_status.sensors.imu.calibration.system,
+        &_status.sensors.imu.calibration.gyro,
+        &_status.sensors.imu.calibration.accel,
+        &_status.sensors.imu.calibration.mag);
+
+    return (bool)_status.sensors.imu.calibration.system;
+}
+
+bool RobotHal::getIMUEvent() {
+    return bno.getEvent(&_status.sensors.imu.imuEvent);
+}
+
+bool RobotHal::restoreCalibrationData() {
+    int eeAddress = 0;
+    long bnoID;
+    sensor_t sensor;
+    adafruit_bno055_offsets_t calibrationData;
+
+    // Attempt to get the sensor ID from the EEPROM
+    EEPROM.get(eeAddress, bnoID);
+    // Get sensor ID from sensor
+    bno.getSensor(&sensor);
+
+    // If they don't match, we don't have calibration data so bail.
+    if (bnoID != sensor.sensor_id) {
+        return false;
+    }
+
+    // offset read address by the size of a long (the sensor ID)
+    eeAddress += sizeof(long);
+    // populate calibrationData from EEPROM
+    EEPROM.get(eeAddress, calibrationData);
+    // Apply offsets to IMU
+    bno.setSensorOffsets(calibrationData);
+    return true;
+}
+
+void RobotHal::saveCalibrationData() {
+    int eeAddress = 0;
+    long bnoID;
+    sensor_t sensor;
+    adafruit_bno055_offsets_t newCalib;
+
+    // get calibration offsets from imu
+    bno.getSensorOffsets(newCalib);
+
+    // get the sensor ID from imu
+    bno.getSensor(&sensor);
+    bnoID = sensor.sensor_id;
+
+    // sotre sensor ID in EEPROM
+    EEPROM.put(eeAddress, bnoID);
+
+    // store calibration offsets in EEPROM
+    eeAddress += sizeof(long);
+    EEPROM.put(eeAddress, newCalib);
+}
+
+void RobotHal::doI2CScan() {
+    for (uint8_t addr = 1; addr <= 127; addr++) {
+        wire->beginTransmission(addr);
+        wire->write(0);
+        _status.activation.i2c[addr] = (wire->endTransmission() == 0);
+    }
 }

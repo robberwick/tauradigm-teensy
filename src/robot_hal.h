@@ -1,6 +1,8 @@
 #ifndef _ROBOT_HAL__H_
 #define _ROBOT_HAL__H_
 
+#include <Adafruit_BNO055.h>
+#include <Adafruit_Sensor.h>
 #include <Servo.h>
 #include <VL53L0X.h>
 #include <Wire.h>
@@ -25,6 +27,14 @@ class RobotHal {
     void initialiseTOFSensors();
     void updateTOFSensors();
 
+    void initialiseIMU();
+    bool calibrateIMU();
+    bool restoreCalibrationData();
+    void saveCalibrationData();
+    bool getIMUEvent();
+
+    void doI2CScan();
+
    private:
     Speeds feedForward(Speeds targetSpeeds);
     Speeds PID(Speeds targetSpeeds, Speeds commandSpeeds);
@@ -39,6 +49,8 @@ class RobotHal {
     float _travelPerEncoderCount = 0.262;
 
     VL53L0X sensor;
+
+    Adafruit_BNO055 bno;
 };
 
 #endif  // _ROBOT_HAL__H_

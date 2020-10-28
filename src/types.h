@@ -7,6 +7,13 @@ struct OrientationReading {
     float z = 0;
 };
 
+struct IMUCalibrationReading {
+    uint8_t system = 0;
+    uint8_t gyro = 0;
+    uint8_t accel = 0;
+    uint8_t mag = 0;
+};
+
 struct Pose {
     float heading = 0;
     float x = 0;
@@ -19,9 +26,15 @@ struct SensorData {
         long current[6] = {0, 0, 0, 0, 0, 0};
     } encoders;
     float tofDistances[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    struct IMUData {
+        IMUCalibrationReading calibration;
+        sensors_event_t imuEvent;
+    } imu;
 };
 
 struct ActivationStatus {
+    bool i2c[128];
+    bool imu = false;
     bool tofSensors[8] = {false, false, false, false, false, false, false, false};
 };
 

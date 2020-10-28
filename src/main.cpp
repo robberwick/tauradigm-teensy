@@ -4,7 +4,6 @@
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <Chrono.h>
-#include <EEPROM.h>
 #include <Encoder.h>
 #include <SerialTransfer.h>
 #include <Servo.h>
@@ -36,7 +35,6 @@ SerialTransfer myTransfer;
 Chrono receiveMessage;
 Chrono readSensors;
 
-// bool activeToFSensors[8];
 int16_t lightSensors[4];
 
 Encoder encoders[NUM_ENCODERS] = {
@@ -60,9 +58,11 @@ void do_i2c_scan() {
     screen.display.clearDisplay();
     screen.display.setCursor(0, 0);
     screen.display.println("I2c Devices");
+    screen.display.display();
     for (uint8_t addr = 1; addr <= 127; addr++) {
         Wire.beginTransmission(addr);
-        if (!Wire.endTransmission() == 0) {
+        Wire.write(0);
+        if (Wire.endTransmission() == 0) {
             //C++20 has a contains() method for unordered_map
             // but find() is only one available to us?
             if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()) {
@@ -101,7 +101,10 @@ void processMessage(SerialTransfer &transfer) {
 
 void post() {
     // do i2c scan
-    do_i2c_scan();
+    hal.doI2CScan();
+    screen.setMode(Screen::Mode::POST_I2C);
+    screen.showScreen();
+    delay(4000);
 
     // Attach motors
     // init motors
@@ -123,114 +126,46 @@ void post() {
     delay(4000);
 
     // //initialise IMU
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 0);
-    screen.display.println(F("IMU"));
-    // Do we have an IMU
-    if (!bno.begin()) {
-        screen.display.println("FAIL");
-        screen.display.display();
-        delay(3000);
-    } else {
-        screen.display.println("OK");
-        screen.display.display();
-        delay(3000);
+    hal.initialiseIMU();
 
-        screen.display.clearDisplay();
-        screen.display.setCursor(0, 0);
+    // IMU Init Status
+    screen.setMode(Screen::Mode::POST_IMU_INIT_STATUS);
+    screen.showScreen();
+    delay(500);
 
-        // look for calibration data. if it exists, load it.
-        // if not, calibrate then store the data in the EEPROM
-        int eeAddress = 0;
-        long bnoID;
-        EEPROM.get(eeAddress, bnoID);
-
-        adafruit_bno055_offsets_t calibrationData;
-        sensor_t sensor;
-
-        bno.getSensor(&sensor);
-        if (bnoID != sensor.sensor_id) {
-            screen.display.println("No Calibration Data in EEPROM");
-
-        } else {
-            screen.display.println("Found Calibration in EEPROM.");
-            eeAddress += sizeof(long);
-            EEPROM.get(eeAddress, calibrationData);
-
-            screen.display.println("Restoring...");
-            bno.setSensorOffsets(calibrationData);
-
-            screen.display.println("Restored");
-        }
-        screen.display.display();
+    /*
+    If it is initialised:
+    * attempt to load the saved config from EEPROM, report results
+    * perform a calibration movement, until the system reports that it is calibrated
+    * saved the calibration data to the EEPROM
+    */
+    if (robotStatus.activation.imu) {
+        // attempt to restore calibration data
+        screen.setMode(
+            hal.restoreCalibrationData() ? Screen::Mode::POST_IMU_CALIBRATION_RESTORE_OK : Screen::Mode::POST_IMU_CALIBRATION_RESTORE_FAIL);
+        screen.showScreen();
         delay(1000);
 
-        screen.display.clearDisplay();
-        screen.display.setCursor(0, 0);
-        screen.display.println("Move robot now to check calibration");
-        screen.display.display();
-        delay(5000);
-        uint8_t system, gyro, accel, mag;
-        system = gyro = accel = mag = 0;
-        sensors_event_t event;
-        bno.getEvent(&event);
-        screen.display.println("Move sensor to calibrate magnetometers");
-        screen.display.display();
-        u_int8_t curYPos = screen.display.getCursorY();
-        while (!system) {
-            bno.getCalibration(&system, &gyro, &accel, &mag);
-            /* Display the individual values */
-            screen.display.setCursor(0, curYPos);
-            screen.display.print("Sys:");
-            screen.display.print(system, DEC);
-            screen.display.print(" G:");
-            screen.display.print(gyro, DEC);
-            screen.display.print(" A:");
-            screen.display.print(accel, DEC);
-            screen.display.print(" M:");
-            screen.display.println(mag, DEC);
-            screen.display.setCursor(0, curYPos + 10);
-            /* Display the individual values */
+        // perform calibration - repeat until system calibration is true
+        while (!hal.calibrateIMU()) {
+            // update the imuEvent in the status object
+            hal.getIMUEvent();
+            // delay by the defined sample rate
             delay(BNO055_SAMPLERATE_DELAY_MS);
-            screen.display.print("X:");
-            screen.display.print(event.orientation.x, 4);
-            screen.display.print(" Y:");
-            screen.display.print(event.orientation.y, 4);
-            screen.display.print(" Z:");
-            screen.display.println(event.orientation.z, 4);
-            screen.display.display();
-            bno.getEvent(&event);
-            delay(BNO055_SAMPLERATE_DELAY_MS);
+            screen.setMode(Screen::Mode::POST_IMU_CALIBRATE_WITH_EVENT);
+            screen.showScreen();
         }
-        screen.display.println("calibrated OK");
-        screen.display.display();
-        delay(3000);
 
-        adafruit_bno055_offsets_t newCalib;
-        bno.getSensorOffsets(newCalib);
-        screen.display.clearDisplay();
-        screen.display.setCursor(0, 0);
-
-        screen.display.println("Storing calibration data to EEPROM...");
-
-        eeAddress = 0;
-        bno.getSensor(&sensor);
-        bnoID = sensor.sensor_id;
-
-        EEPROM.put(eeAddress, bnoID);
-
-        eeAddress += sizeof(long);
-        EEPROM.put(eeAddress, newCalib);
-        screen.display.println("Data stored to EEPROM.");
-        screen.display.display();
-
+        // save the config to EEPROM
+        hal.saveCalibrationData();
+        screen.setMode(Screen::Mode::POST_IMU_CALIBRATION_SAVED);
+        screen.showScreen();
         delay(2000);
     }
 
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 0);
-    screen.display.println("Running");
-    screen.display.display();
+    // Show Running screen
+    screen.setMode(Screen::Mode::RUNNING);
+    screen.showScreen();
 }
 
 void setup() {
@@ -283,6 +218,8 @@ void setup() {
     bool enterPost = false;
     if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold) {
         enterPost = true;
+        screen.display.clearDisplay();
+        screen.display.setCursor(0, 0);
         screen.display.println("Entering POST...");
         screen.display.display();
         delay(500);
@@ -301,34 +238,23 @@ void setup() {
         hal.initialiseTOFSensors();
 
         // //initialise IMU
-        screen.display.clearDisplay();
-        screen.display.setCursor(0, 0);
-        if (!bno.begin()) {
-            screen.display.println("IMU FAIL");
-        } else {
-            screen.display.println("IMU CAL:");
-        }
-        uint8_t system, gyro, accel, mag;
-        system = gyro = accel = mag = 0;
+        // TODO - should we halt here if the IMU fails?
+        hal.initialiseIMU();
 
-        u_int8_t curYPos = screen.display.getCursorY();
-        while (!system) {
-            bno.getCalibration(&system, &gyro, &accel, &mag);
-            screen.display.setCursor(0, curYPos);
-            /* Display the individual values */
-            screen.display.print("Sys:");
-            screen.display.print(system, DEC);
-            screen.display.print(" G:");
-            screen.display.print(gyro, DEC);
-            screen.display.print(" A:");
-            screen.display.print(accel, DEC);
-            screen.display.print(" M:");
-            screen.display.println(mag, DEC);
-            screen.display.display();
-        };
-        screen.display.println("calibrated OK");
-        screen.display.display();
-        delay(200);
+        screen.setMode(Screen::Mode::POST_IMU_INIT_STATUS);
+        screen.showScreen();
+        delay(500);
+
+        // perform calibration - repeat until system calibration is true
+        while (!hal.calibrateIMU()) {
+            screen.setMode(Screen::Mode::POST_IMU_CALIBRATE);
+            screen.showScreen();
+        }
+
+        //  show calibration complete screen
+        screen.setMode(Screen::Mode::POST_IMU_CALIBRATION_COMPLETE);
+        screen.showScreen();
+        delay(500);
     }
 }
 

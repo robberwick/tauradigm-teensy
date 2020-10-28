@@ -35,8 +35,20 @@ void Screen::showScreen() {
     display.setCursor(0, 0);
 
     switch (_currentMode) {
+        case Mode::START_UP:
+            showStartup();
+            break;
+
+        case Mode::GIT_STATUS:
+            showGitStatus();
+            break;
+
         case Mode::PRE_POST:
             showPrePost();
+            break;
+
+        case Mode::POST_I2C:
+            showPostI2C();
             break;
 
         case Mode::POST_MOTORS:
@@ -51,27 +63,37 @@ void Screen::showScreen() {
             showPostTOF();
             break;
 
-        case Mode::POST_ADC:
+        case Mode::POST_IMU_INIT_STATUS:
+            showPostIMUInitStatus();
             break;
 
-        case Mode::POST_IMU:
+        case Mode::POST_IMU_CALIBRATION_RESTORE_OK:
+            showPostIMUCalibrationRestoreOK();
             break;
 
-        case Mode::POST_IMU_CALIBRATION_STATUS:
+        case Mode::POST_IMU_CALIBRATION_RESTORE_FAIL:
+            showPostIMUCalibrationRestoreFail();
             break;
 
         case Mode::POST_IMU_CALIBRATE:
+            showPostIMUCalibrateSystem();
+            break;
+
+        case Mode::POST_IMU_CALIBRATE_WITH_EVENT:
+            showPostIMUCalibrateSystem();
+            showPostIMUCalibrateEvent();
             break;
 
         case Mode::POST_IMU_CALIBRATION_COMPLETE:
+            showPostIMUCalibrationComplete();
             break;
 
-        case Mode::START_UP:
-            showStartup();
+        case Mode::POST_IMU_CALIBRATION_SAVED:
+            showPostIMUCalibrationSaved();
             break;
 
-        case Mode::GIT_STATUS:
-            showGitStatus();
+        case Mode::RUNNING:
+            showRunning();
             break;
 
         case Mode::IMU:
@@ -155,6 +177,77 @@ void Screen::showPostTOF() {
             display.println("");
         } else {
             display.setCursor(64, display.getCursorY());
+        }
+    }
+}
+
+void Screen::showPostIMUInitStatus() {
+    if (!_status.activation.imu) {
+        display.println("IMU FAIL");
+    } else {
+        display.println("IMU INIT OK:");
+    }
+}
+
+void Screen::showPostIMUCalibrationRestoreFail() {
+    display.println("No IMU offset Data");
+    display.println("found in EEPROM");
+}
+
+void Screen::showPostIMUCalibrationRestoreOK() {
+    display.println("IMU offset Data");
+    display.println("restored successfully");
+}
+
+void Screen::showPostIMUCalibrateSystem() {
+    display.println("Move robot to");
+    display.println("calibrate IMU");
+    display.println("");
+    display.print("Sys:");
+    display.print(_status.sensors.imu.calibration.system, DEC);
+    display.print(" G:");
+    display.print(_status.sensors.imu.calibration.gyro, DEC);
+    display.print(" A:");
+    display.print(_status.sensors.imu.calibration.accel, DEC);
+    display.print(" M:");
+    display.println(_status.sensors.imu.calibration.mag, DEC);
+}
+
+void Screen::showPostIMUCalibrateEvent() {
+    display.print("X:");
+    display.println(_status.sensors.imu.imuEvent.orientation.x, 4);
+    display.print("Y:");
+    display.println(_status.sensors.imu.imuEvent.orientation.y, 4);
+    display.print("Z:");
+    display.println(_status.sensors.imu.imuEvent.orientation.z, 4);
+}
+
+void Screen::showPostIMUCalibrationSaved() {
+    display.println("IMU offset data");
+    display.println("stored to EEPROM.");
+}
+
+void Screen::showPostIMUCalibrationComplete() {
+    display.println("Calibrated OK");
+}
+
+void Screen::showRunning() {
+    display.println("Running");
+}
+
+void Screen::showPostI2C() {
+    display.println("I2c Devices");
+
+    for (uint8_t addr = 1; addr <= 127; addr++) {
+        if (_status.activation.i2c[addr]) {
+            //C++20 has a contains() method for unordered_map
+            // but find() is only one available to us?
+            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()) {
+                display.println(I2C_ADDRESS_NAMES.at(addr));
+            } else {
+                display.print("0x");
+                display.println(addr, HEX);
+            }
         }
     }
 }

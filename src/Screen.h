@@ -50,17 +50,21 @@ class Screen {
            uint32_t clkAfter = 100000UL);
     Adafruit_SSD1306 display;
     enum Mode {
+        START_UP,
+        GIT_STATUS,
         PRE_POST,
+        POST_I2C,
         POST_MOTORS,
         POST_SERIAL,
         POST_TOF,
-        POST_ADC,
-        POST_IMU,
-        POST_IMU_CALIBRATION_STATUS,
+        POST_IMU_INIT_STATUS,
+        POST_IMU_CALIBRATION_RESTORE_OK,
+        POST_IMU_CALIBRATION_RESTORE_FAIL,
         POST_IMU_CALIBRATE,
+        POST_IMU_CALIBRATE_WITH_EVENT,
         POST_IMU_CALIBRATION_COMPLETE,
-        START_UP,
-        GIT_STATUS,
+        POST_IMU_CALIBRATION_SAVED,
+        RUNNING,  // This wil be repalced with the individual pages in time
         IMU,
         SENSOR_DATA,
         TIMING,
@@ -73,17 +77,21 @@ class Screen {
    private:
     Screen::Mode _currentMode = Screen::Mode::START_UP;
     Status &_status;
+    void showStartup();
+    void showGitStatus();
     void showPrePost();
+    void showPostI2C();
     void showPostMotors();
     void showPostSerial();
     void showPostTOF();
-    void showPostADC();
-    void showPostIMU();
-    void showPostIMUCalibrationStatus();
-    void showPostIMUCalibrate();
+    void showPostIMUInitStatus();
+    void showPostIMUCalibrationRestoreOK();
+    void showPostIMUCalibrationRestoreFail();
+    void showPostIMUCalibrateSystem();
+    void showPostIMUCalibrateEvent();
     void showPostIMUCalibrationComplete();
-    void showStartup();
-    void showGitStatus();
+    void showPostIMUCalibrationSaved();
+    void showRunning();
     void showIMU();
     void showSensorData();
     void showTiming();
