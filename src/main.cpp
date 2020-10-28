@@ -237,7 +237,6 @@ void loop() {
         receiveMessage.restart();
     }
 
-    // screen.display.invertDisplay(shouldInvertDisplay);
     if (robotStatus.batteryIsLow() || robotStatus.motorMessageCommsDown()) {
         screen.setMode(Screen::Mode::ERROR);
 
