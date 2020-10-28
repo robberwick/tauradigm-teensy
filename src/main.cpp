@@ -330,6 +330,37 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
 
+void pickupCube() {
+    //open jaw
+    esc_1.writeMicroseconds(1600);
+    delay(400);
+    //jaw down
+    esc_2.writeMicroseconds(1300);
+    delay(500);
+    //close jaw
+    esc_1.writeMicroseconds(900);
+    delay(500);
+    //jaw up
+    esc_2.writeMicroseconds(2100);
+    delay(500);
+}
+
+void putDownCube(){
+    //jaw down
+    esc_2.writeMicroseconds(1300);
+    delay(500);
+    //open jaw
+    esc_1.writeMicroseconds(1600);
+    delay(500);
+    //back up
+    Speeds MotorSpeeds;
+    MotorSpeeds.left = MotorSpeeds.right = -40;
+    setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
+    delay(1000);
+    MotorSpeeds = deadStop;
+    setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
+}
+
 float distanceToWaypoint(Pose target, Pose current){
     //returns distance 'as the crow flies' to the target pose 
     float distance;
@@ -422,10 +453,9 @@ void processMessage(SerialTransfer &transfer) {
                     delay(200);
                     break;
                 case 'x':
-                    esc_2.writeMicroseconds(1300);
                     display.println(F("jaw down"));
                     display.display();
-                    delay(200);
+                    putDownCube();
                     break;
                 case 's':
                     esc_1.writeMicroseconds(1600);
@@ -434,10 +464,9 @@ void processMessage(SerialTransfer &transfer) {
                     delay(200);
                     break;
                 case 't':
-                    esc_2.writeMicroseconds(2100);
                     display.println(F("jaw up"));
                     display.display();
-                    delay(200);
+                    pickupCube();
                     break;
                 case 'l':
                     display.println(F("zeroing heading"));

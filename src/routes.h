@@ -9,7 +9,7 @@ struct Pose {
 //#define RH_SQUARE // right hand square
 //#define LH_SQUARE // left hand square
 //#define GARDEN_PATH // Up The Garden Path challenge route
-//#define TIDY_TOYS // Tidy Up The Toys challenge route
+#define TIDY_TOYS // Tidy Up The Toys challenge route
 
 // right hand square
 #ifdef RH_SQUARE
