@@ -17,6 +17,7 @@
 #include "Wire.h"
 #include "config.h"
 #include "graphics.h"
+#include "routes.h"
 
 // #define DEBUG
 
@@ -28,12 +29,14 @@ Servo motorLeft;
 Servo motorRight;
 Servo esc_1;
 Servo esc_2;
-
+/*
 struct Pose {
     float heading;
     float x;
     float y;
 } currentPosition, previousPosition;
+*/
+Pose currentPosition, previousPosition;
 float headingOffset=0;
 struct Speeds {
     float left;
@@ -353,8 +356,8 @@ float headingToWaypoint(Pose target, Pose current){
 
 void navigate(){
     Speeds MotorSpeeds;
-    float positionTolerance = 100;
-    Pose targetWaypoint = waypoints[currentWaypoint];
+    float positionTolerance = 150;
+    Pose targetWaypoint = route[currentWaypoint];
     float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition); 
     if (distanceToGo < positionTolerance) {
         currentWaypoint += 1;
@@ -368,8 +371,8 @@ void navigate(){
         float speedP = 0.25;
         float turnP = 20;
         float maxCorrection = 40;
-        float minSpeed = 40;
-        float maxSpeed = 80;
+        float minSpeed = 50;
+        float maxSpeed = 90;
         float headingError = headingToWaypoint(targetWaypoint, currentPosition);
         display.println(" ");
         display.printf("heading: %2.2f", headingError);
@@ -789,14 +792,6 @@ void setup() {
         display.display();
         delay(200);
     }
-    waypoints[0].x = 500;
-    waypoints[0].y = 0;
-    waypoints[1].x = 500;
-    waypoints[1].y = 500;
-    waypoints[2].x = 0;
-    waypoints[2].y = 500;
-    waypoints[3].x = 0;
-    waypoints[3].y = 0;
 }
 
 void loop() {
