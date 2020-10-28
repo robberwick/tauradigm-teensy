@@ -358,7 +358,10 @@ void putDownCube(){
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
     delay(1000);
     MotorSpeeds = deadStop;
-    setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
+    for (uint8_t t = 0; t < 5; t++) {
+        setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
+        delay(100);
+    }
 }
 
 float distanceToWaypoint(Pose target, Pose current){
@@ -391,12 +394,22 @@ void navigate(){
     Pose targetWaypoint = route[currentWaypoint];
     float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition); 
     if (distanceToGo < positionTolerance) {
+        MotorSpeeds = deadStop;
+        for (uint8_t t = 0; t < 5; t++) {
+            setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
+            delay(100);
+        }
+        if (currentWaypoint < 3){
+            pickupCube();
+        } else {
+            putDownCube();
+        }
         currentWaypoint += 1;
         uint8_t numOfWaypoints = sizeof(route) / sizeof(route[0]);
         if (currentWaypoint > numOfWaypoints){
             navigating = false;
             currentWaypoint = 0;
-            MotorSpeeds.left = MotorSpeeds.right = 0;
+            MotorSpeeds = deadStop;
         }
     } else {
         float speedP = 0.25;
