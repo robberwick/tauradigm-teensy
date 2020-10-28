@@ -233,6 +233,9 @@ void Screen::showPostIMUCalibrationComplete() {
 
 void Screen::showRunning() {
     display.println("Running");
+    display.println("");
+    display.println("Battery Voltage:");
+    display.printf("%2.2f V", _status.getBatteryVoltage());
 }
 
 void Screen::showPostI2C() {
