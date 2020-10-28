@@ -355,17 +355,23 @@ void navigate(){
     Speeds MotorSpeeds;
     float positionTolerance = 100;
     Pose targetWaypoint = waypoints[2];
-    if (distanceToWaypoint(targetWaypoint, currentPosition) < positionTolerance) {   
+    float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition); 
+    if (distanceToGo < positionTolerance) {   
         MotorSpeeds.left = MotorSpeeds.right = 0;
         navigating = false;
     } else {
-        MotorSpeeds.left = MotorSpeeds.right = 30;
-        float turnP = 20;
+        float speedP = 0.25;
+        float turnP = 30;
+        float maxCorrection = 40;
+        float maxSpeed = 80;
         float headingError = headingToWaypoint(targetWaypoint, currentPosition);
         display.println(" ");
         display.printf("heading: %2.2f", headingError);
         display.display();
-        float turnSpeed = turnP * headingError;
+        if (turnP*headingError < maxCorrection){
+            MotorSpeeds.left = MotorSpeeds.right = min(maxSpeed,(distanceToGo*speedP));
+        }
+        float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
         MotorSpeeds.left+=turnSpeed;
         MotorSpeeds.right-=turnSpeed;
     }
