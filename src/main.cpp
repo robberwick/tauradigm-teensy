@@ -356,12 +356,12 @@ float headingToWaypoint(Pose target, Pose current){
 
 void navigate(){
     Speeds MotorSpeeds;
-    float positionTolerance = 150;
+    float positionTolerance = 100;
     Pose targetWaypoint = route[currentWaypoint];
     float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition); 
     if (distanceToGo < positionTolerance) {
         currentWaypoint += 1;
-        uint8_t numOfWaypoints = sizeof(waypoints) / sizeof(waypoints[0]);
+        uint8_t numOfWaypoints = sizeof(route) / sizeof(route[0]);
         if (currentWaypoint > numOfWaypoints){
             navigating = false;
             currentWaypoint = 0;
@@ -372,7 +372,7 @@ void navigate(){
         float turnP = 20;
         float maxCorrection = 40;
         float minSpeed = 50;
-        float maxSpeed = 90;
+        float maxSpeed = 70;
         float headingError = headingToWaypoint(targetWaypoint, currentPosition);
         display.println(" ");
         display.printf("heading: %2.2f", headingError);
