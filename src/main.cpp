@@ -41,7 +41,7 @@ struct Speeds {
 };
 float averageSpeed;
 float minSpeed = 1;
-struct Pose waypoints[3];
+struct Pose waypoints[4];
 uint8_t currentWaypoint=0;
 bool navigating = false;
 
@@ -354,22 +354,28 @@ float headingToWaypoint(Pose target, Pose current){
 void navigate(){
     Speeds MotorSpeeds;
     float positionTolerance = 100;
-    Pose targetWaypoint = waypoints[2];
+    Pose targetWaypoint = waypoints[currentWaypoint];
     float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition); 
-    if (distanceToGo < positionTolerance) {   
-        MotorSpeeds.left = MotorSpeeds.right = 0;
-        navigating = false;
+    if (distanceToGo < positionTolerance) {
+        currentWaypoint += 1;
+        uint8_t numOfWaypoints = sizeof(waypoints) / sizeof(waypoints[0]);
+        if (currentWaypoint > numOfWaypoints){
+            navigating = false;
+            currentWaypoint = 0;
+            MotorSpeeds.left = MotorSpeeds.right = 0;
+        }
     } else {
         float speedP = 0.25;
-        float turnP = 30;
+        float turnP = 20;
         float maxCorrection = 40;
+        float minSpeed = 40;
         float maxSpeed = 80;
         float headingError = headingToWaypoint(targetWaypoint, currentPosition);
         display.println(" ");
         display.printf("heading: %2.2f", headingError);
         display.display();
         if (turnP*headingError < maxCorrection){
-            MotorSpeeds.left = MotorSpeeds.right = min(maxSpeed,(distanceToGo*speedP));
+            MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (distanceToGo*speedP)), minSpeed);
         }
         float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
         MotorSpeeds.left+=turnSpeed;
@@ -447,8 +453,6 @@ void processMessage(SerialTransfer &transfer) {
                 case 'u':
                     display.println(F("navigating to next waypoint"));
                     display.display();
-                    currentWaypoint += 1;
-                    currentWaypoint = currentWaypoint % sizeof(waypoints);
                     navigating=true;
                     break;
                 case 'd':
@@ -785,12 +789,14 @@ void setup() {
         display.display();
         delay(200);
     }
-    waypoints[0].x = 0;
-    waypoints[0].y = -50;
+    waypoints[0].x = 500;
+    waypoints[0].y = 0;
     waypoints[1].x = 500;
-    waypoints[1].y = 0;
-    waypoints[2].x = 900;
-    waypoints[2].y = 0;
+    waypoints[1].y = 500;
+    waypoints[2].x = 0;
+    waypoints[2].y = 500;
+    waypoints[3].x = 0;
+    waypoints[3].y = 0;
 }
 
 void loop() {
