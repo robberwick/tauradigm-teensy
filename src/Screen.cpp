@@ -122,7 +122,6 @@ void Screen::showScreen() {
 }
 
 void Screen::showError() {
-    display.setCursor(0, 0);
     if (_status.motorMessageCommsDown()) {
         display.printf("missed message %d", _status.missedMotorMessageCount);
         display.println();
@@ -142,7 +141,6 @@ void Screen::showStartup() {
 }
 
 void Screen::showGitStatus() {
-    display.setCursor(0, 10);
     display.println("Git Branch:");
     display.println(_status.git.branch);
     display.println("Git commit hash:");
@@ -150,14 +148,11 @@ void Screen::showGitStatus() {
 }
 
 void Screen::showPostMotors() {
-    display.setCursor(0, 0);
     display.println("Motors");
-    display.setCursor(0, 10);
     display.print("OK");
 }
 
 void Screen::showPrePost() {
-    display.setCursor(0, 10);
     display.println("Press button now");
     display.println("to enter POST");
     display.println();
@@ -166,14 +161,11 @@ void Screen::showPrePost() {
 }
 
 void Screen::showPostSerial() {
-    display.setCursor(0, 0);
     display.println("Serial transfer");
-
     display.print("OK");
 }
 
 void Screen::showPostTOF() {
-    display.setCursor(0, 0);
     display.println("ToF sensors");
     for (uint8_t t = 0; t < 8; t++) {
         if (_status.activation.tofSensors[t]) {

@@ -246,6 +246,9 @@ void loop() {
 
         // Set motors to dead stop
         hal.stopMotors();
+    } else {
+        screen.setMode(Screen::Mode::RUNNING);
+        screen.showScreen();
     }
 
     if (readSensors.hasPassed(10)) {
