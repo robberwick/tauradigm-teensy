@@ -51,8 +51,10 @@ class Screen {
     Adafruit_SSD1306 display;
     enum Mode {
         START_UP,
+        DEBUG_WARNING,
         GIT_STATUS,
         PRE_POST,
+        POST_START,
         POST_I2C,
         POST_MOTORS,
         POST_SERIAL,
@@ -78,8 +80,10 @@ class Screen {
     Screen::Mode _currentMode = Screen::Mode::START_UP;
     Status &_status;
     void showStartup();
+    void showDebugWarning();
     void showGitStatus();
     void showPrePost();
+    void showPostStart();
     void showPostI2C();
     void showPostMotors();
     void showPostSerial();

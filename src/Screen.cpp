@@ -39,12 +39,20 @@ void Screen::showScreen() {
             showStartup();
             break;
 
+        case Mode::DEBUG_WARNING:
+            showDebugWarning();
+            break;
+
         case Mode::GIT_STATUS:
             showGitStatus();
             break;
 
         case Mode::PRE_POST:
             showPrePost();
+            break;
+
+        case Mode::POST_START:
+            showPostStart();
             break;
 
         case Mode::POST_I2C:
@@ -250,4 +258,15 @@ void Screen::showPostI2C() {
             }
         }
     }
+}
+
+void Screen::showPostStart() {
+    display.println("Entering POST...");
+}
+
+void Screen::showDebugWarning() {
+    display.println("*** WARNING ***");
+    display.println("");
+    display.println("Debug flag is set");
+    display.println("Waiting for\nUSB serial");
 }

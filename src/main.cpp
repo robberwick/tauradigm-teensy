@@ -99,36 +99,91 @@ void processMessage(SerialTransfer &transfer) {
     }
 }
 
-void post() {
+void setup() {
+// Initialise I2C bus
+#ifdef ARDUINO_TEENSY31
+    Wire.begin();
+#else
+    Wire.begin(TEENSY_PIN_I2C_SDA, TEENSY_PIN_I2C_SCL);
+#endif
+
+    // Initalise display
+    if (!screen.initDisplay()) {
+        haltAndCatchFire();
+    }
+    // Show Splash Screen
+    screen.setMode(Screen::Mode::START_UP);
+    screen.showScreen();
+    delay(3000);
+
+    // Setup serial comms
+    // Show debug warning if debug flag is set
+#ifdef DEBUG
+    screen.setMode(Screen::Mode::DEBUG_WARNING);
+    screen.showScreen();
+    delay(1000);
+    Serial.begin(115200);
+    while (!Serial) {
+    };
+#endif
+
+    Serial2.begin(1000000);
+    while (!Serial2) {
+    };
+
+    screen.setMode(Screen::Mode::GIT_STATUS);
+    screen.showScreen();
+    delay(2000);
+
+    screen.setMode(Screen::Mode::PRE_POST);
+    screen.showScreen();
+    delay(2000);
+
+    pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
+    uint32_t buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
+    bool shouldRunPost = false;
+    if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold) {
+        shouldRunPost = true;
+        screen.setMode(Screen::Mode::POST_START);
+        screen.showScreen();
+        delay(500);
+    }
     // do i2c scan
     hal.doI2CScan();
-    screen.setMode(Screen::Mode::POST_I2C);
-    screen.showScreen();
-    delay(4000);
+    if (shouldRunPost) {
+        screen.setMode(Screen::Mode::POST_I2C);
+        screen.showScreen();
+        delay(4000);
+    }
 
-    // Attach motors
-    // init motors
+    // Initialise motors
     hal.initialiseMotors();
-    screen.setMode(Screen::Mode::POST_MOTORS);
-    screen.showScreen();
-    delay(500);
+    if (shouldRunPost) {
+        screen.setMode(Screen::Mode::POST_MOTORS);
+        screen.showScreen();
+        delay(500);
+    }
 
     // Initialise serial transfer
-    screen.setMode(Screen::Mode::POST_SERIAL);
     myTransfer.begin(Serial2);
-    screen.showScreen();
-    delay(500);
+    if (shouldRunPost) {
+        myTransfer.begin(Serial2);
+        screen.showScreen();
+        delay(500);
+    }
 
     // Initialise ToF sensors
     hal.initialiseTOFSensors();
-    screen.setMode(Screen::Mode::POST_TOF);
-    screen.showScreen();
-    delay(4000);
+    if (shouldRunPost) {
+        screen.setMode(Screen::Mode::POST_TOF);
+        screen.showScreen();
+        delay(4000);
+    }
 
     // //initialise IMU
+    // TODO - should we halt here if the IMU fails?
     hal.initialiseIMU();
 
-    // IMU Init Status
     screen.setMode(Screen::Mode::POST_IMU_INIT_STATUS);
     screen.showScreen();
     delay(500);
@@ -161,95 +216,6 @@ void post() {
         screen.setMode(Screen::Mode::POST_IMU_CALIBRATION_SAVED);
         screen.showScreen();
         delay(2000);
-    }
-
-    // Show Running screen
-    screen.setMode(Screen::Mode::RUNNING);
-    screen.showScreen();
-}
-
-void setup() {
-// Initialise I2C bus
-#ifdef ARDUINO_TEENSY31
-    Wire.begin();
-#else
-    Wire.begin(TEENSY_PIN_I2C_SDA, TEENSY_PIN_I2C_SCL);
-#endif
-
-    // Initalise display
-    if (!screen.initDisplay()) {
-        haltAndCatchFire();
-    }
-    // Show Splash Screen
-    screen.setMode(Screen::Mode::START_UP);
-    screen.showScreen();
-    delay(3000);
-
-    // Setup serial comms
-    // Show debug warning if debug flag is set
-#ifdef DEBUG
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 0);
-    screen.display.println(F("*** WARNING ***"));
-    screen.display.println("");
-    screen.display.println("Debug flag is set");
-    screen.display.println("Waiting for\nUSB serial");
-    screen.display.display();
-    delay(1000);
-    Serial.begin(115200);
-    while (!Serial) {
-    };
-#endif
-
-    Serial2.begin(1000000);
-    while (!Serial2) {
-    };
-
-    screen.setMode(Screen::Mode::GIT_STATUS);
-    screen.showScreen();
-    delay(2000);
-
-    screen.setMode(Screen::Mode::PRE_POST);
-    screen.showScreen();
-    delay(2000);
-
-    pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
-    uint32_t buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
-    bool enterPost = false;
-    if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold) {
-        enterPost = true;
-        screen.display.clearDisplay();
-        screen.display.setCursor(0, 0);
-        screen.display.println("Entering POST...");
-        screen.display.display();
-        delay(500);
-    }
-
-    if (enterPost) {
-        post();
-    } else {
-        // Initialise motors
-        hal.initialiseMotors();
-
-        // Initialise serial transfer
-        myTransfer.begin(Serial2);
-
-        // Initialise ToF sensors
-        hal.initialiseTOFSensors();
-
-        // //initialise IMU
-        // TODO - should we halt here if the IMU fails?
-        hal.initialiseIMU();
-
-        screen.setMode(Screen::Mode::POST_IMU_INIT_STATUS);
-        screen.showScreen();
-        delay(500);
-
-        // perform calibration - repeat until system calibration is true
-        while (!hal.calibrateIMU()) {
-            screen.setMode(Screen::Mode::POST_IMU_CALIBRATE);
-            screen.showScreen();
-        }
 
         //  show calibration complete screen
         screen.setMode(Screen::Mode::POST_IMU_CALIBRATION_COMPLETE);
