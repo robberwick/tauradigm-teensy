@@ -1,10 +1,8 @@
+#ifndef _CONFIG__H_
+#define _CONFIG__H_
+
 #include <unordered_map>
 using namespace std;
-
-// M_PI
-#ifndef M_PI
-    #define M_PI 3.14159265358979323846
-#endif
 
 // Pins
 #ifdef ARDUINO_TEENSY31
@@ -15,7 +13,6 @@ using namespace std;
 #include "config/blackpill.h"
 #endif
 
-
 // i2c Addresses
 #define TCA_ADDR 0x70
 #define DISPLAY_ADDR 0x3c
@@ -24,14 +21,18 @@ using namespace std;
 #define ADC_ADDR 0x48
 typedef const std::unordered_map<uint8_t, String> HexIntMap;
 HexIntMap I2C_ADDRESS_NAMES = {
-   {TCA_ADDR, "Multiplexer"},
-   {IMU_ADDR, "IMU"},
-   {TOF_ADDR, "Distance sensor"},
-   {DISPLAY_ADDR, "OLED display"},
-   {ADC_ADDR, "Minesweeper ADC"}
-};
+    {TCA_ADDR, "Multiplexer"},
+    {IMU_ADDR, "IMU"},
+    {TOF_ADDR, "Distance sensor"},
+    {DISPLAY_ADDR, "OLED display"},
+    {ADC_ADDR, "Minesweeper ADC"}};
 // hardware counts
 #define NUM_ENCODERS 6
 
 // timing constants
 #define BNO055_SAMPLERATE_DELAY_MS (100)
+
+// Comms constants
+#define MAX_MISSED_MOTOR_MESSAGES 10
+
+#endif  //_CONFIG__H_
