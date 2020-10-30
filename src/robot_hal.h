@@ -32,6 +32,9 @@ class RobotHal {
     bool restoreCalibrationData();
     void saveCalibrationData();
     bool getIMUEvent();
+    void updateIMU();
+
+    void updateSensors();
 
     void doI2CScan();
 

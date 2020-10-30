@@ -225,6 +225,10 @@ void setup() {
 }
 
 void loop() {
+    // update sensor readings
+    // currently only TOF and IMU, but will also include encoders as part of issue #52
+    hal.updateSensors();
+
     // Is there an incoming message available?
     if (myTransfer.available()) {
         processMessage(myTransfer);
@@ -252,20 +256,11 @@ void loop() {
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
-
-        // update TOF sensor readings
-        hal.updateTOFSensors();
-
         /// Read Encoder counts
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
             robotStatus.sensors.encoders.previous[n] = robotStatus.sensors.encoders.current[n];
             robotStatus.sensors.encoders.current[n] = encoders[n].read();
         }
-
-        // Update orientation status from IMU
-        sensors_event_t orientationData;
-        bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
-        robotStatus.updateOrientation(orientationData);
 
         uint16_t payloadSize = 0;
 

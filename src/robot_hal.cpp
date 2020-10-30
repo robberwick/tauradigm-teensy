@@ -289,3 +289,14 @@ void RobotHal::doI2CScan() {
         _status.activation.i2c[addr] = (wire->endTransmission() == 0);
     }
 }
+
+void RobotHal::updateSensors() {
+    updateTOFSensors();
+    updateIMU();
+}
+
+void RobotHal::updateIMU() {
+    sensors_event_t orientationData;
+    bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
+    _status.updateOrientation(orientationData);
+}
