@@ -4,7 +4,6 @@
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <Chrono.h>
-#include <Encoder.h>
 #include <SerialTransfer.h>
 #include <Servo.h>
 #include <VL53L0X.h>
@@ -36,14 +35,6 @@ Chrono receiveMessage;
 Chrono readSensors;
 
 int16_t lightSensors[4];
-
-Encoder encoders[NUM_ENCODERS] = {
-    Encoder(TEENSY_PIN_ENC1A, TEENSY_PIN_ENC1B),
-    Encoder(TEENSY_PIN_ENC2A, TEENSY_PIN_ENC2B),
-    Encoder(TEENSY_PIN_ENC3A, TEENSY_PIN_ENC3B),
-    Encoder(TEENSY_PIN_ENC4A, TEENSY_PIN_ENC4B),
-    Encoder(TEENSY_PIN_ENC5A, TEENSY_PIN_ENC5B),
-    Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B)};
 
 Screen screen(robotStatus, 128, 64);
 
@@ -257,10 +248,7 @@ void loop() {
         hal.updateTOFSensors();
 
         /// Read Encoder counts
-        for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
-            robotStatus.sensors.encoders.previous[n] = robotStatus.sensors.encoders.current[n];
-            robotStatus.sensors.encoders.current[n] = encoders[n].read();
-        }
+        hal.updateEncoders();
 
         // Update orientation status from IMU
         sensors_event_t orientationData;

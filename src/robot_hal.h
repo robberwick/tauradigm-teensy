@@ -3,10 +3,12 @@
 
 #include <Adafruit_BNO055.h>
 #include <Adafruit_Sensor.h>
+#include <Encoder.h>
 #include <Servo.h>
 #include <VL53L0X.h>
 #include <Wire.h>
 
+#include "config.h"
 #include "status.h"
 #include "types.h"
 
@@ -32,6 +34,10 @@ class RobotHal {
     bool restoreCalibrationData();
     void saveCalibrationData();
     bool getIMUEvent();
+    void updateIMU();
+
+    void initialiseEncoders();
+    void updateEncoders();
 
     void doI2CScan();
 
@@ -51,6 +57,11 @@ class RobotHal {
     VL53L0X sensor;
 
     Adafruit_BNO055 bno;
+
+    // define encoders as an array of pointers to Encoder objects
+    // as Encoder does not have a default constructor, so we can't do
+    // Encoder encoders[NUM_ENCODERS]
+    Encoder *encoders[NUM_ENCODERS];
 };
 
 #endif  // _ROBOT_HAL__H_
