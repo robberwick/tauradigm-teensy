@@ -91,7 +91,7 @@ void processMessage(SerialTransfer &transfer) {
         default:
             Speeds requestedMotorSpeeds;
             transfer.rxObj(requestedMotorSpeeds, recSize);
-            hal.setMotorSpeeds(requestedMotorSpeeds);
+            hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
             // reset the missed motor mdessage count
             robotStatus.resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
@@ -291,4 +291,7 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
+
+    // Update motor speeds
+    hal.updateMotorSpeeds();
 }

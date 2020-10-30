@@ -10,7 +10,12 @@ class Status {
    public:
     ActivationStatus activation;
     SensorData sensors;
-    Speeds speed;
+    struct
+    {
+        Speeds currentSpeed;
+        Speeds requestedSpeed;
+        float averageSpeed;
+    } speeds;
     float averageSpeed;
     Pose pose;
     uint32_t missedMotorMessageCount = 0;

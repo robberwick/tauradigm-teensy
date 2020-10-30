@@ -20,10 +20,14 @@ bool RobotHal::initialiseMotors() {
 };
 
 void RobotHal::stopMotors() {
-    setMotorSpeeds(_deadStop);
+    setRequestedMotorSpeeds(_deadStop);
 }
 
-void RobotHal::setMotorSpeeds(Speeds requestedMotorSpeeds) {
+void RobotHal::setRequestedMotorSpeeds(Speeds requestedMotorSpeeds) {
+    _status.speeds.requestedSpeed = requestedMotorSpeeds;
+}
+
+void RobotHal::updateMotorSpeeds() {
     Speeds commandMotorSpeeds, targetMotorSpeeds;
 
     //convert -100 - +100 percentage speed command into mm/sec
@@ -31,8 +35,8 @@ void RobotHal::setMotorSpeeds(Speeds requestedMotorSpeeds) {
     // but for manual control, and for testing speedcontrol precision
     // better to start with limiting to lower speeds
     float maxspeed_mm_per_sec = 1000;  //max acheivable is ~3200
-    targetMotorSpeeds.right = requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
-    targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
+    targetMotorSpeeds.right = _status.speeds.requestedSpeed.right * maxspeed_mm_per_sec / 100;
+    targetMotorSpeeds.left = _status.speeds.requestedSpeed.left * maxspeed_mm_per_sec / 100;
 
     //convert speed commands into predicted power
     // otherwise known as feedforward. We can do feedforward
@@ -43,10 +47,10 @@ void RobotHal::setMotorSpeeds(Speeds requestedMotorSpeeds) {
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
 
     // check if the command speed has been close to zero for a while
-    _status.averageSpeed = 0.5 * _status.averageSpeed + 0.5 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
+    _status.speeds.averageSpeed = 0.5 * _status.speeds.averageSpeed + 0.5 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
 
     //if its been zero for a while, just stop, else work out the PID modified speeds
-    if (_status.averageSpeed < _minSpeed) {
+    if (_status.speeds.averageSpeed < _minSpeed) {
         commandMotorSpeeds = _deadStop;
     } else {
         //apply PID to motor powers based on deviation from target speed
@@ -54,6 +58,7 @@ void RobotHal::setMotorSpeeds(Speeds requestedMotorSpeeds) {
     }
 
     // save the current commanded motor speeds to the status obj
+    _status.speeds.currentSpeed = commandMotorSpeeds;
 
     motors.left.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motors.right.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
