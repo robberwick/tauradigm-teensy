@@ -32,8 +32,8 @@ RobotHal hal(robotStatus);
 
 SerialTransfer myTransfer;
 
-Chrono receiveMessage;
-Chrono readSensors;
+Chrono receiveMessageTimeout;
+Chrono sendSensorDataTimeout;
 
 int16_t lightSensors[4];
 
@@ -95,7 +95,7 @@ void processMessage(SerialTransfer &transfer) {
             // reset the missed motor mdessage count
             robotStatus.resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
-            receiveMessage.restart();
+            receiveMessageTimeout.restart();
     }
 }
 
@@ -236,9 +236,9 @@ void loop() {
 
     // if the message sending timeout has passed then increment the missed count
     // and reset
-    if (receiveMessage.hasPassed(20)) {
+    if (receiveMessageTimeout.hasPassed(20)) {
         robotStatus.incrementMissedMotorCount();
-        receiveMessage.restart();
+        receiveMessageTimeout.restart();
     }
 
     if (robotStatus.batteryIsLow() || robotStatus.motorMessageCommsDown()) {
@@ -254,8 +254,8 @@ void loop() {
         screen.showScreen();
     }
 
-    if (readSensors.hasPassed(10)) {
-        readSensors.restart();
+    if (sendSensorDataTimeout.hasPassed(10)) {
+        sendSensorDataTimeout.restart();
         /// Read Encoder counts
         for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
             robotStatus.sensors.encoders.previous[n] = robotStatus.sensors.encoders.current[n];
