@@ -7,11 +7,13 @@
 #include "types.h"
 #include "utils.h"
 
-RobotHal::RobotHal(Status &status, TwoWire *twi) : _status(status), wire(twi ? twi : &Wire) {
+RobotHal::RobotHal(Status &status, TwoWire *twi) : _status(status), wire(twi ? twi : &Wire)
+{
     bno = Adafruit_BNO055(55, IMU_ADDR, wire);
 };
 
-bool RobotHal::initialiseMotors() {
+bool RobotHal::initialiseMotors()
+{
     // attach motors and set to dead stop
     motors.left.attach(TEENSY_PIN_DRIVE_LEFT);
     motors.right.attach(TEENSY_PIN_DRIVE_RIGHT);
@@ -19,20 +21,27 @@ bool RobotHal::initialiseMotors() {
     return true;
 };
 
-void RobotHal::stopMotors() {
-    setMotorSpeeds(_deadStop);
+void RobotHal::stopMotors()
+{
+    setRequestedMotorSpeeds(_deadStop);
 }
 
-void RobotHal::setMotorSpeeds(Speeds requestedMotorSpeeds) {
+void RobotHal::setRequestedMotorSpeeds(Speeds requestedMotorSpeeds)
+{
+    _status.speeds.requestedSpeed = requestedMotorSpeeds;
+}
+
+void RobotHal::updateMotorSpeeds()
+{
     Speeds commandMotorSpeeds, targetMotorSpeeds;
 
     //convert -100 - +100 percentage speed command into mm/sec
     // for autonomous control we could revert back to using full scale
     // but for manual control, and for testing speedcontrol precision
     // better to start with limiting to lower speeds
-    float maxspeed_mm_per_sec = 1000;  //max acheivable is ~3200
-    targetMotorSpeeds.right = requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
-    targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
+    float maxspeed_mm_per_sec = 1000; //max acheivable is ~3200
+    targetMotorSpeeds.right = _status.speeds.requestedSpeed.right * maxspeed_mm_per_sec / 100;
+    targetMotorSpeeds.left = _status.speeds.requestedSpeed.left * maxspeed_mm_per_sec / 100;
 
     //convert speed commands into predicted power
     // otherwise known as feedforward. We can do feedforward
@@ -43,33 +52,38 @@ void RobotHal::setMotorSpeeds(Speeds requestedMotorSpeeds) {
     commandMotorSpeeds = feedForward(targetMotorSpeeds);
 
     // check if the command speed has been close to zero for a while
-    _status.averageSpeed = 0.5 * _status.averageSpeed + 0.5 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
+    _status.speeds.averageSpeed = 0.5 * _status.speeds.averageSpeed + 0.5 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
 
     //if its been zero for a while, just stop, else work out the PID modified speeds
-    if (_status.averageSpeed < _minSpeed) {
+    if (_status.speeds.averageSpeed < _minSpeed)
+    {
         commandMotorSpeeds = _deadStop;
-    } else {
+    }
+    else
+    {
         //apply PID to motor powers based on deviation from target speed
         commandMotorSpeeds = PID(targetMotorSpeeds, commandMotorSpeeds);
     }
 
     // save the current commanded motor speeds to the status obj
+    _status.speeds.currentSpeed = commandMotorSpeeds;
 
     motors.left.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motors.right.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
 
-Speeds RobotHal::feedForward(Speeds targetSpeeds) {
+Speeds RobotHal::feedForward(Speeds targetSpeeds)
+{
     // takes two speed commands in mm/sec
     // returns predicted motor power -100 to +100%
     //inputs and outputs both Speed structs
 
     struct Speeds commandSpeeds;
 
-    float minTurnPower = 4;       //determined from practical testing
-    float minForwardPower = 5;    //same
-    float powerCoefficient = 50;  //same
-    float turnThreshold = 100;    //units: mm/sec. arbitary, value.
+    float minTurnPower = 4;      //determined from practical testing
+    float minForwardPower = 5;   //same
+    float powerCoefficient = 50; //same
+    float turnThreshold = 100;   //units: mm/sec. arbitary, value.
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
@@ -77,20 +91,26 @@ Speeds RobotHal::feedForward(Speeds targetSpeeds) {
 
     // since there's a min power needed to move (as defined above)
     // first check if we're trying to move
-    if (targetSpeeds.left != 0 and targetSpeeds.right != 0) {
+    if (targetSpeeds.left != 0 and targetSpeeds.right != 0)
+    {
         //then check if we're trying to turn or not, i.e. left and right speeds different
-        if (abs(targetSpeeds.right - targetSpeeds.left) > turnThreshold) {
+        if (abs(targetSpeeds.right - targetSpeeds.left) > turnThreshold)
+        {
             //then predict power needed to acheive that speed. formule derived from curve fitting experimental results
             float turnComponent = sgn(targetSpeeds.right - targetSpeeds.left) * (abs(targetSpeeds.right - targetSpeeds.left) / powerCoefficient + minTurnPower);
             float forwardComponent = (targetSpeeds.right + targetSpeeds.left) / 2 / powerCoefficient;
             commandSpeeds.right = turnComponent + forwardComponent;
             commandSpeeds.left = -turnComponent + forwardComponent;
-        } else {
+        }
+        else
+        {
             //a different formula is best fit for going straight
             commandSpeeds.right = sgn(targetSpeeds.right) * (abs(targetSpeeds.right) / powerCoefficient + minForwardPower);
             commandSpeeds.left = sgn(targetSpeeds.left) * (abs(targetSpeeds.left) / powerCoefficient + minForwardPower);
         }
-    } else {
+    }
+    else
+    {
         //if we're not trying to move, turn the motors off
         commandSpeeds.right = 0;
         commandSpeeds.left = 0;
@@ -98,7 +118,8 @@ Speeds RobotHal::feedForward(Speeds targetSpeeds) {
     return commandSpeeds;
 }
 
-Speeds RobotHal::PID(Speeds targetSpeeds, Speeds commandSpeeds) {
+Speeds RobotHal::PID(Speeds targetSpeeds, Speeds commandSpeeds)
+{
     // apply PID
     // takes two speed commands in -100 to +100 and two
     // target speeds in mm/sec
@@ -110,7 +131,7 @@ Speeds RobotHal::PID(Speeds targetSpeeds, Speeds commandSpeeds) {
     //. i.e power percentage proporational to difference
     // between desired speed and current actual wheel speed
     static long lastLoopTime;
-    float loopTime = (millis() - lastLoopTime) / 1000.0;  // divide by 1000 converts to seconds.
+    float loopTime = (millis() - lastLoopTime) / 1000.0; // divide by 1000 converts to seconds.
     lastLoopTime = millis();
 
     //work out target turn rate
@@ -129,7 +150,7 @@ Speeds RobotHal::PID(Speeds targetSpeeds, Speeds commandSpeeds) {
 
     // do actual Proportional calc.
     //speed error is target - actual.
-    float fwdKp = 0.01;  //ie. how much power to use for a given speed error
+    float fwdKp = 0.01; //ie. how much power to use for a given speed error
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
     commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
     float turnKp = 2;
@@ -145,13 +166,15 @@ Speeds RobotHal::PID(Speeds targetSpeeds, Speeds commandSpeeds) {
     return commandSpeeds;
 }
 
-Speeds RobotHal::getWheelTravel() {
+Speeds RobotHal::getWheelTravel()
+{
     // Uses minimum encoder reading to estimate actual travel speed.
     // returns a speed struct of wheel travel in mm
 
     //compare old and latest encoder readings to see how much each wheel has rotated
     float wheelTravel[NUM_ENCODERS];
-    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+    for (u_int8_t n = 0; n < NUM_ENCODERS; n++)
+    {
         wheelTravel[n] = ((float)(_status.sensors.encoders.current[n] - _status.sensors.encoders.previous[n])) * _travelPerEncoderCount;
     }
     //most representative speed assumed to be slowest wheel
@@ -165,19 +188,23 @@ Speeds RobotHal::getWheelTravel() {
     return travel;
 }
 
-float RobotHal::getDistanceTravelled() {
+float RobotHal::getDistanceTravelled()
+{
     //returns the average distance travelled by right and left wheels, in mm
     Speeds travel = getWheelTravel();
     return (travel.left - travel.right) / 2;
 }
 
-void RobotHal::initialiseTOFSensors() {
-    for (uint8_t t = 0; t < 8; t++) {
+void RobotHal::initialiseTOFSensors()
+{
+    for (uint8_t t = 0; t < 8; t++)
+    {
         tcaselect(t);
         bool sensorActivated = sensor.init();
         _status.activation.tofSensors[t] = sensorActivated;
 
-        if (sensorActivated) {
+        if (sensorActivated)
+        {
             sensor.setMeasurementTimingBudget(33000);
             // lower the return signal rate limit (default is 0.25 MCPS)
             sensor.setSignalRateLimit(0.1);
@@ -193,24 +220,32 @@ void RobotHal::initialiseTOFSensors() {
     }
 }
 
-void RobotHal::updateTOFSensors() {
+void RobotHal::updateTOFSensors()
+{
     // Iterate through ToF sensors and attempt to get reading
-    for (uint8_t t = 0; t < 8; t++) {
+    for (uint8_t t = 0; t < 8; t++)
+    {
         tcaselect(t);
-        if (_status.activation.tofSensors[t]) {
+        if (_status.activation.tofSensors[t])
+        {
             _status.sensors.tofDistances[t] = sensor.readRangeContinuousMillimeters();
             // TODO we should aim to keep this timeout to a minimum - flag occurrences?
-            if (sensor.timeoutOccurred()) {
+            if (sensor.timeoutOccurred())
+            {
                 _status.sensors.tofDistances[t] = 0;
             }
-        } else {
+        }
+        else
+        {
             _status.sensors.tofDistances[t] = 0;
         }
     }
 }
 
-void RobotHal::tcaselect(uint8_t i) {
-    if (i > 7) {
+void RobotHal::tcaselect(uint8_t i)
+{
+    if (i > 7)
+    {
         return;
     }
     wire->beginTransmission(TCA_ADDR);
@@ -218,11 +253,13 @@ void RobotHal::tcaselect(uint8_t i) {
     wire->endTransmission();
 }
 
-void RobotHal::initialiseIMU() {
+void RobotHal::initialiseIMU()
+{
     _status.activation.imu = bno.begin();
 };
 
-bool RobotHal::calibrateIMU() {
+bool RobotHal::calibrateIMU()
+{
     bno.getCalibration(
         &_status.sensors.imu.calibration.system,
         &_status.sensors.imu.calibration.gyro,
@@ -232,11 +269,13 @@ bool RobotHal::calibrateIMU() {
     return (bool)_status.sensors.imu.calibration.system;
 }
 
-bool RobotHal::getIMUEvent() {
+bool RobotHal::getIMUEvent()
+{
     return bno.getEvent(&_status.sensors.imu.imuEvent);
 }
 
-bool RobotHal::restoreCalibrationData() {
+bool RobotHal::restoreCalibrationData()
+{
     int eeAddress = 0;
     long bnoID;
     sensor_t sensor;
@@ -248,7 +287,8 @@ bool RobotHal::restoreCalibrationData() {
     bno.getSensor(&sensor);
 
     // If they don't match, we don't have calibration data so bail.
-    if (bnoID != sensor.sensor_id) {
+    if (bnoID != sensor.sensor_id)
+    {
         return false;
     }
 
@@ -261,7 +301,8 @@ bool RobotHal::restoreCalibrationData() {
     return true;
 }
 
-void RobotHal::saveCalibrationData() {
+void RobotHal::saveCalibrationData()
+{
     int eeAddress = 0;
     long bnoID;
     sensor_t sensor;
@@ -282,8 +323,10 @@ void RobotHal::saveCalibrationData() {
     EEPROM.put(eeAddress, newCalib);
 }
 
-void RobotHal::doI2CScan() {
-    for (uint8_t addr = 1; addr <= 127; addr++) {
+void RobotHal::doI2CScan()
+{
+    for (uint8_t addr = 1; addr <= 127; addr++)
+    {
         wire->beginTransmission(addr);
         wire->write(0);
         _status.activation.i2c[addr] = (wire->endTransmission() == 0);

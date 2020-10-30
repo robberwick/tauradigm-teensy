@@ -6,11 +6,17 @@
 
 #include "types.h"
 
-class Status {
-   public:
+class Status
+{
+public:
     ActivationStatus activation;
     SensorData sensors;
-    Speeds speed;
+    struct
+    {
+        Speeds currentSpeed;
+        Speeds requestedSpeed;
+        float averageSpeed;
+    } speeds;
     float averageSpeed;
     Pose pose;
     uint32_t missedMotorMessageCount = 0;
@@ -31,8 +37,8 @@ class Status {
 
     GitData git;
 
-   private:
+private:
     float _minBatVoltage = 11.1;
 };
 
-#endif  //_STATUS__H_
+#endif //_STATUS__H_

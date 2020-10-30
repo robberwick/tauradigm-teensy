@@ -49,25 +49,33 @@ Screen screen(robotStatus, 128, 64);
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, IMU_ADDR);
 
-void haltAndCatchFire() {
-    while (1) {
+void haltAndCatchFire()
+{
+    while (1)
+    {
     }
 }
 
-void do_i2c_scan() {
+void do_i2c_scan()
+{
     screen.display.clearDisplay();
     screen.display.setCursor(0, 0);
     screen.display.println("I2c Devices");
     screen.display.display();
-    for (uint8_t addr = 1; addr <= 127; addr++) {
+    for (uint8_t addr = 1; addr <= 127; addr++)
+    {
         Wire.beginTransmission(addr);
         Wire.write(0);
-        if (Wire.endTransmission() == 0) {
+        if (Wire.endTransmission() == 0)
+        {
             //C++20 has a contains() method for unordered_map
             // but find() is only one available to us?
-            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()) {
+            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end())
+            {
                 screen.display.println(I2C_ADDRESS_NAMES.at(addr));
-            } else {
+            }
+            else
+            {
                 screen.display.print("0x");
                 screen.display.println(addr, HEX);
             }
@@ -77,7 +85,8 @@ void do_i2c_scan() {
     delay(4000);
 }
 
-void processMessage(SerialTransfer &transfer) {
+void processMessage(SerialTransfer &transfer)
+{
     // use this variable to keep track of how many
     // bytes we've processed from the receive buffer
     uint16_t recSize = 0;
@@ -85,21 +94,23 @@ void processMessage(SerialTransfer &transfer) {
     // Get message type, indicated by the first byte of the message
     uint8_t messageType;
     recSize = myTransfer.rxObj(messageType, recSize);
-    switch (messageType) {
-        // 0 - motor speed message
-        case 1:
-        default:
-            Speeds requestedMotorSpeeds;
-            transfer.rxObj(requestedMotorSpeeds, recSize);
-            hal.setMotorSpeeds(requestedMotorSpeeds);
-            // reset the missed motor mdessage count
-            robotStatus.resetMissedMotorCount();
-            // We received a valid motor command, so reset the timer
-            receiveMessage.restart();
+    switch (messageType)
+    {
+    // 0 - motor speed message
+    case 1:
+    default:
+        Speeds requestedMotorSpeeds;
+        transfer.rxObj(requestedMotorSpeeds, recSize);
+        hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
+        // reset the missed motor mdessage count
+        robotStatus.resetMissedMotorCount();
+        // We received a valid motor command, so reset the timer
+        receiveMessage.restart();
     }
 }
 
-void setup() {
+void setup()
+{
 // Initialise I2C bus
 #ifdef ARDUINO_TEENSY31
     Wire.begin();
@@ -108,7 +119,8 @@ void setup() {
 #endif
 
     // Initalise display
-    if (!screen.initDisplay()) {
+    if (!screen.initDisplay())
+    {
         haltAndCatchFire();
     }
     // Show Splash Screen
@@ -123,12 +135,14 @@ void setup() {
     screen.showScreen();
     delay(1000);
     Serial.begin(115200);
-    while (!Serial) {
+    while (!Serial)
+    {
     };
 #endif
 
     Serial2.begin(1000000);
-    while (!Serial2) {
+    while (!Serial2)
+    {
     };
 
     screen.setMode(Screen::Mode::GIT_STATUS);
@@ -140,9 +154,10 @@ void setup() {
     delay(2000);
 
     pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
-    uint32_t buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
+    uint32_t buttonThreshold = 30; //1024 should be supply voltage, button pulls pin low
     bool shouldRunPost = false;
-    if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold) {
+    if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold)
+    {
         shouldRunPost = true;
         screen.setMode(Screen::Mode::POST_START);
         screen.showScreen();
@@ -150,7 +165,8 @@ void setup() {
     }
     // do i2c scan
     hal.doI2CScan();
-    if (shouldRunPost) {
+    if (shouldRunPost)
+    {
         screen.setMode(Screen::Mode::POST_I2C);
         screen.showScreen();
         delay(4000);
@@ -158,7 +174,8 @@ void setup() {
 
     // Initialise motors
     hal.initialiseMotors();
-    if (shouldRunPost) {
+    if (shouldRunPost)
+    {
         screen.setMode(Screen::Mode::POST_MOTORS);
         screen.showScreen();
         delay(500);
@@ -166,7 +183,8 @@ void setup() {
 
     // Initialise serial transfer
     myTransfer.begin(Serial2);
-    if (shouldRunPost) {
+    if (shouldRunPost)
+    {
         myTransfer.begin(Serial2);
         screen.showScreen();
         delay(500);
@@ -174,7 +192,8 @@ void setup() {
 
     // Initialise ToF sensors
     hal.initialiseTOFSensors();
-    if (shouldRunPost) {
+    if (shouldRunPost)
+    {
         screen.setMode(Screen::Mode::POST_TOF);
         screen.showScreen();
         delay(4000);
@@ -194,7 +213,8 @@ void setup() {
     * perform a calibration movement, until the system reports that it is calibrated
     * saved the calibration data to the EEPROM
     */
-    if (robotStatus.activation.imu) {
+    if (robotStatus.activation.imu)
+    {
         // attempt to restore calibration data
         screen.setMode(
             hal.restoreCalibrationData() ? Screen::Mode::POST_IMU_CALIBRATION_RESTORE_OK : Screen::Mode::POST_IMU_CALIBRATION_RESTORE_FAIL);
@@ -202,7 +222,8 @@ void setup() {
         delay(1000);
 
         // perform calibration - repeat until system calibration is true
-        while (!hal.calibrateIMU()) {
+        while (!hal.calibrateIMU())
+        {
             // update the imuEvent in the status object
             hal.getIMUEvent();
             // delay by the defined sample rate
@@ -224,20 +245,24 @@ void setup() {
     }
 }
 
-void loop() {
+void loop()
+{
     // Is there an incoming message available?
-    if (myTransfer.available()) {
+    if (myTransfer.available())
+    {
         processMessage(myTransfer);
     }
 
     // if the message sending timeout has passed then increment the missed count
     // and reset
-    if (receiveMessage.hasPassed(20)) {
+    if (receiveMessage.hasPassed(20))
+    {
         robotStatus.incrementMissedMotorCount();
         receiveMessage.restart();
     }
 
-    if (robotStatus.batteryIsLow() || robotStatus.motorMessageCommsDown()) {
+    if (robotStatus.batteryIsLow() || robotStatus.motorMessageCommsDown())
+    {
         screen.setMode(Screen::Mode::ERROR);
 
         // TODO move this outside the if block when we're only using the screen class for displaying info
@@ -245,19 +270,23 @@ void loop() {
 
         // Set motors to dead stop
         hal.stopMotors();
-    } else {
+    }
+    else
+    {
         screen.setMode(Screen::Mode::RUNNING);
         screen.showScreen();
     }
 
-    if (readSensors.hasPassed(10)) {
+    if (readSensors.hasPassed(10))
+    {
         readSensors.restart();
 
         // update TOF sensor readings
         hal.updateTOFSensors();
 
         /// Read Encoder counts
-        for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+        for (u_int8_t n = 0; n < NUM_ENCODERS; n++)
+        {
             robotStatus.sensors.encoders.previous[n] = robotStatus.sensors.encoders.current[n];
             robotStatus.sensors.encoders.current[n] = encoders[n].read();
         }
@@ -291,4 +320,7 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
+
+    // Update motor speeds
+    hal.updateMotorSpeeds();
 }

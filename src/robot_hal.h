@@ -10,17 +10,20 @@
 #include "status.h"
 #include "types.h"
 
-class RobotHal {
-   public:
+class RobotHal
+{
+public:
     RobotHal(Status &status, TwoWire *twi = &Wire);
-    struct Motors {
+    struct Motors
+    {
         Servo left;
         Servo right;
     } motors;
 
     bool initialiseMotors();
     void stopMotors();
-    void setMotorSpeeds(Speeds requestedMotorSpeeds);
+    void setRequestedMotorSpeeds(Speeds requestedMotorSpeeds);
+    void updateMotorSpeeds();
     Speeds getWheelTravel();
     float getDistanceTravelled();
 
@@ -35,7 +38,7 @@ class RobotHal {
 
     void doI2CScan();
 
-   private:
+private:
     Speeds feedForward(Speeds targetSpeeds);
     Speeds PID(Speeds targetSpeeds, Speeds commandSpeeds);
     void tcaselect(uint8_t i);
@@ -53,4 +56,4 @@ class RobotHal {
     Adafruit_BNO055 bno;
 };
 
-#endif  // _ROBOT_HAL__H_
+#endif // _ROBOT_HAL__H_
