@@ -308,3 +308,14 @@ void RobotHal::updateEncoders() {
         _status.sensors.encoders.current[n] = encoders[n]->read();
     }
 }
+
+void RobotHal::updateSensors() {
+    updateTOFSensors();
+    updateIMU();
+}
+
+void RobotHal::updateIMU() {
+    sensors_event_t orientationData;
+    bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
+    _status.updateOrientation(orientationData);
+}

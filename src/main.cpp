@@ -31,8 +31,12 @@ RobotHal hal(robotStatus);
 
 SerialTransfer myTransfer;
 
-Chrono receiveMessage;
-Chrono readSensors;
+// timers
+Chrono receiveMessageTimeout;
+Chrono sendSensorDataTimeout;
+Chrono updateIMUTimeout;
+Chrono updateTOFTimeout;
+Chrono updateEncodersTimeout;
 
 int16_t lightSensors[4];
 
@@ -86,7 +90,7 @@ void processMessage(SerialTransfer &transfer) {
             // reset the missed motor mdessage count
             robotStatus.resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
-            receiveMessage.restart();
+            receiveMessageTimeout.restart();
     }
 }
 
@@ -216,6 +220,26 @@ void setup() {
 }
 
 void loop() {
+    // Do we need to update the various sensors?
+    if (updateEncodersTimeout.hasPassed(UPDATE_ENCODER_TIMEOUT_MS)) {
+        // Read Encoder counts
+        hal.updateEncoders();
+        // restart timer
+        updateEncodersTimeout.restart();
+    }
+
+    if (updateIMUTimeout.hasPassed(UPDATE_IMU_TIMEOUT_MS)) {
+        hal.updateIMU();
+        // restart timer
+        updateIMUTimeout.restart();
+    }
+
+    if (updateTOFTimeout.hasPassed(UPDATE_TOF_TIMEOUT_MS)) {
+        hal.updateTOFSensors();
+        // restart timer
+        updateTOFTimeout.restart();
+    }
+
     // Is there an incoming message available?
     if (myTransfer.available()) {
         processMessage(myTransfer);
@@ -223,9 +247,9 @@ void loop() {
 
     // if the message sending timeout has passed then increment the missed count
     // and reset
-    if (receiveMessage.hasPassed(20)) {
+    if (receiveMessageTimeout.hasPassed(MOTOR_MESSAGE_TIMEOUT_MS)) {
         robotStatus.incrementMissedMotorCount();
-        receiveMessage.restart();
+        receiveMessageTimeout.restart();
     }
 
     if (robotStatus.batteryIsLow() || robotStatus.motorMessageCommsDown()) {
@@ -241,20 +265,8 @@ void loop() {
         screen.showScreen();
     }
 
-    if (readSensors.hasPassed(10)) {
-        readSensors.restart();
-
-        // update TOF sensor readings
-        hal.updateTOFSensors();
-
-        /// Read Encoder counts
-        hal.updateEncoders();
-
-        // Update orientation status from IMU
-        sensors_event_t orientationData;
-        bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
-        robotStatus.updateOrientation(orientationData);
-
+    if (sendSensorDataTimeout.hasPassed(SEND_SENSOR_DATA_TIMEOUT_MS)) {
+        sendSensorDataTimeout.restart();
         uint16_t payloadSize = 0;
 
         //update odometry

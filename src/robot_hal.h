@@ -39,6 +39,8 @@ class RobotHal {
     void initialiseEncoders();
     void updateEncoders();
 
+    void updateSensors();
+
     void doI2CScan();
 
    private:
