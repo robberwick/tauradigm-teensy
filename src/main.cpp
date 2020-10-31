@@ -31,8 +31,12 @@ RobotHal hal(robotStatus);
 
 SerialTransfer myTransfer;
 
+// timers
 Chrono receiveMessageTimeout;
 Chrono sendSensorDataTimeout;
+Chrono updateIMUTimeout;
+Chrono updateTOFTimeout;
+Chrono updateEncodersTimeout;
 
 int16_t lightSensors[4];
 
@@ -216,9 +220,19 @@ void setup() {
 }
 
 void loop() {
-    // update sensor readings
-    // currently only TOF and IMU, but will also include encoders as part of issue #52
-    hal.updateSensors();
+    // Do we need to update the various sensors?
+    if (updateEncodersTimeout.hasPassed(UPDATE_ENCODER_TIMEOUT_MS)) {
+        // Read Encoder counts
+        hal.updateEncoders();
+    }
+
+    if (updateIMUTimeout.hasPassed(UPDATE_IMU_TIMEOUT_MS)) {
+        hal.updateIMU();
+    }
+
+    if (updateTOFTimeout.hasPassed(UPDATE_TOF_TIMEOUT_MS)) {
+        hal.updateTOFSensors();
+    }
 
     // Is there an incoming message available?
     if (myTransfer.available()) {
@@ -227,7 +241,7 @@ void loop() {
 
     // if the message sending timeout has passed then increment the missed count
     // and reset
-    if (receiveMessageTimeout.hasPassed(20)) {
+    if (receiveMessageTimeout.hasPassed(MOTOR_MESSAGE_TIMEOUT_MS)) {
         robotStatus.incrementMissedMotorCount();
         receiveMessageTimeout.restart();
     }
@@ -245,11 +259,8 @@ void loop() {
         screen.showScreen();
     }
 
-    if (sendSensorDataTimeout.hasPassed(10)) {
+    if (sendSensorDataTimeout.hasPassed(SEND_SENSOR_DATA_TIMEOUT_MS)) {
         sendSensorDataTimeout.restart();
-        /// Read Encoder counts
-        hal.updateEncoders();
-
         uint16_t payloadSize = 0;
 
         //update odometry
