@@ -12,7 +12,7 @@ RobotHal::RobotHal(Status &status, TwoWire *twi) : _status(status), wire(twi ? t
     bno = Adafruit_BNO055(55, IMU_ADDR, wire);
 
     initialiseEncoders();
-    _status.averageBattV = getBatteryVoltage();
+    _status.battery.averageV = getBatteryVoltage();
 };
 
 bool RobotHal::initialiseMotors() {
@@ -330,8 +330,9 @@ void RobotHal::updateBatteryStatus() {
     //measured battery voltage dips up to 0.5V for brief periods (motor direction change) and
     // drops ~0.2V when motors are stalled. Time weighting filters them out. 
     float timeWeighting = 0.1; //fraction of current reading to be used for moving average
-    _status.averageBattV = (1 - timeWeighting) * _status.averageBattV + timeWeighting * getBatteryVoltage();
-    _status.batteryIsLow = _status.averageBattV < _minBatVoltage;
+    _status.battery.currentV = getBatteryVoltage();
+    _status.battery.averageV = (1 - timeWeighting) * _status.battery.averageV + timeWeighting * _status.battery.currentV;
+    _status.battery.isLow = _status.battery.averageV < _minBatVoltage;
 }
 
 float RobotHal::getBatteryVoltage() {

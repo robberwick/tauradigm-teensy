@@ -16,9 +16,12 @@ class Status {
         Speeds requestedSpeed;
         float averageSpeed;
     } speeds;
-    float averageSpeed;
-    float averageBattV;
-    bool batteryIsLow;
+    struct
+    {
+        float currentV;
+        float averageV;
+        bool isLow;
+    } battery;
     
     Pose pose;
     uint32_t missedMotorMessageCount = 0;
