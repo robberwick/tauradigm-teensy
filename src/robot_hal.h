@@ -22,7 +22,8 @@ class RobotHal {
 
     bool initialiseMotors();
     void stopMotors();
-    void setMotorSpeeds(Speeds requestedMotorSpeeds);
+    void setRequestedMotorSpeeds(Speeds requestedMotorSpeeds);
+    void updateMotorSpeeds();
     Speeds getWheelTravel();
     float getDistanceTravelled();
 
