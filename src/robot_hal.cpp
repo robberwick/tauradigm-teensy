@@ -137,10 +137,10 @@ Speeds RobotHal::PID(Speeds targetSpeeds, Speeds commandSpeeds) {
 
     // do actual Proportional calc.
     //speed error is target - actual.
-    float fwdKp = 0.01;  //ie. how much power to use for a given speed error
+    float fwdKp = 0.05;  //ie. how much power to use for a given speed error
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
     commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
-    float turnKp = 2;
+    float turnKp = 5;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right -= steeringCorrection;
