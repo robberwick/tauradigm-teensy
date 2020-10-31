@@ -37,6 +37,7 @@ Chrono sendSensorDataTimeout;
 Chrono updateIMUTimeout;
 Chrono updateTOFTimeout;
 Chrono updateEncodersTimeout;
+Chrono updateBattTimeout;
 
 int16_t lightSensors[4];
 
@@ -216,7 +217,11 @@ void loop() {
         // restart timer
         updateTOFTimeout.restart();
     }
-
+    if (updateBattTimeout.hasPassed(UPDATE_BATT_TIMEOUT_MS)) {
+        hal.updateBatteryStatus();
+        // restart timer
+        updateBattTimeout.restart();
+    }
     // Is there an incoming message available?
     if (myTransfer.available()) {
         processMessage(myTransfer);
@@ -229,7 +234,8 @@ void loop() {
         receiveMessageTimeout.restart();
     }
 
-    if (robotStatus.batteryIsLow() || robotStatus.motorMessageCommsDown()) {
+
+    if (robotStatus.batteryIsLow || robotStatus.motorMessageCommsDown()) {
         screen.setMode(Screen::Mode::ERROR);
 
         // TODO move this outside the if block when we're only using the screen class for displaying info

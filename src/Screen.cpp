@@ -127,7 +127,7 @@ void Screen::showError() {
         display.println();
     }
     // is battery going flat?
-    if (_status.batteryIsLow()) {
+    if (_status.batteryIsLow) {
         display.printf("low battery");
         display.println();
     }
@@ -157,7 +157,7 @@ void Screen::showPrePost() {
     display.println("to enter POST");
     display.println();
     display.println("Battery Voltage:");
-    display.printf("%2.2f V", _status.getBatteryVoltage());
+    display.printf("%2.2f V", _status.averageBattV);
 }
 
 void Screen::showPostSerial() {
@@ -235,7 +235,7 @@ void Screen::showRunning() {
     display.println("Running");
     display.println("");
     display.println("Battery Voltage:");
-    display.printf("%2.2f V", _status.getBatteryVoltage());
+    display.printf("%2.2f V", _status.averageBattV);
 }
 
 void Screen::showPostI2C() {
