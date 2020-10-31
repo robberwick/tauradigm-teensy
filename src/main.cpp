@@ -339,10 +339,9 @@ void pickupCube() {
     delay(500);
     //close jaw
     esc_1.writeMicroseconds(900);
-    delay(500);
+    delay(400);
     //jaw up
     esc_2.writeMicroseconds(2100);
-    delay(500);
 }
 
 void putDownCube(){
@@ -358,7 +357,7 @@ void putDownCube(){
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
     delay(1000);
     MotorSpeeds = deadStop;
-    for (uint8_t t = 0; t < 5; t++) {
+    for (uint8_t t = 0; t < 2; t++) {
         setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
         delay(100);
     }
@@ -413,7 +412,7 @@ void navigate(){
         }
     } else {
         float speedP = 0.25;
-        float turnP = 20;
+        float turnP = 25;
         float maxCorrection = 40;
         float minSpeed = 50;
         float maxSpeed = 70;
@@ -884,7 +883,7 @@ void loop() {
     }
 
 
-    if (readSensors.hasPassed(100)) {
+    if (readSensors.hasPassed(10)) {
         readSensors.restart();
         // Iterate through ToF sensors and attempt to get reading
         for (uint8_t t = 0; t < 8; t++) {

@@ -51,9 +51,9 @@ struct Pose {
 // Tidy Up The Toys challenge route
 #ifdef TIDY_TOYS
     Pose route[] = { 
-        {950, 0},
-        {800, -430},
-        {860, 460},
-        {550, -650}
+        {800, 60},
+        {820, -400},
+        {750, 460},
+        {450, -520}
     };
 #endif
