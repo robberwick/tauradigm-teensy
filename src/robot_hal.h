@@ -53,7 +53,7 @@ class RobotHal {
     TwoWire *wire;
 
     Speeds _deadStop = {0, 0};
-    float _minSpeed = 20;
+    float _minSpeed = 1;
     float _trackWidth = 136;
     float _travelPerEncoderCount = 0.262;
 
