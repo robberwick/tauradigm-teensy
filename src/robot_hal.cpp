@@ -1,6 +1,7 @@
 #include "robot_hal.h"
 
 #include <EEPROM.h>
+#include <Encoder.h>
 #include <VL53L0X.h>
 
 #include "config.h"
@@ -9,6 +10,8 @@
 
 RobotHal::RobotHal(Status &status, TwoWire *twi) : _status(status), wire(twi ? twi : &Wire) {
     bno = Adafruit_BNO055(55, IMU_ADDR, wire);
+
+    initialiseEncoders();
 };
 
 bool RobotHal::initialiseMotors() {
@@ -287,5 +290,21 @@ void RobotHal::doI2CScan() {
         wire->beginTransmission(addr);
         wire->write(0);
         _status.activation.i2c[addr] = (wire->endTransmission() == 0);
+    }
+}
+void RobotHal::initialiseEncoders() {
+    encoders[0] = new Encoder(TEENSY_PIN_ENC1A, TEENSY_PIN_ENC1B);
+    encoders[1] = new Encoder(TEENSY_PIN_ENC2A, TEENSY_PIN_ENC2B);
+    encoders[2] = new Encoder(TEENSY_PIN_ENC3A, TEENSY_PIN_ENC3B);
+    encoders[3] = new Encoder(TEENSY_PIN_ENC4A, TEENSY_PIN_ENC4B);
+    encoders[4] = new Encoder(TEENSY_PIN_ENC5A, TEENSY_PIN_ENC5B);
+    encoders[5] = new Encoder(TEENSY_PIN_ENC6A, TEENSY_PIN_ENC6B);
+}
+
+void RobotHal::updateEncoders() {
+    /// Read Encoder counts
+    for (u_int8_t n = 0; n < NUM_ENCODERS; n++) {
+        _status.sensors.encoders.previous[n] = _status.sensors.encoders.current[n];
+        _status.sensors.encoders.current[n] = encoders[n]->read();
     }
 }
