@@ -224,14 +224,20 @@ void loop() {
     if (updateEncodersTimeout.hasPassed(UPDATE_ENCODER_TIMEOUT_MS)) {
         // Read Encoder counts
         hal.updateEncoders();
+        // restart timer
+        updateEncodersTimeout.restart();
     }
 
     if (updateIMUTimeout.hasPassed(UPDATE_IMU_TIMEOUT_MS)) {
         hal.updateIMU();
+        // restart timer
+        updateIMUTimeout.restart();
     }
 
     if (updateTOFTimeout.hasPassed(UPDATE_TOF_TIMEOUT_MS)) {
         hal.updateTOFSensors();
+        // restart timer
+        updateTOFTimeout.restart();
     }
 
     // Is there an incoming message available?
