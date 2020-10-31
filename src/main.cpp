@@ -54,29 +54,6 @@ void haltAndCatchFire() {
     }
 }
 
-void do_i2c_scan() {
-    screen.display.clearDisplay();
-    screen.display.setCursor(0, 0);
-    screen.display.println("I2c Devices");
-    screen.display.display();
-    for (uint8_t addr = 1; addr <= 127; addr++) {
-        Wire.beginTransmission(addr);
-        Wire.write(0);
-        if (Wire.endTransmission() == 0) {
-            //C++20 has a contains() method for unordered_map
-            // but find() is only one available to us?
-            if (I2C_ADDRESS_NAMES.find(addr) != I2C_ADDRESS_NAMES.end()) {
-                screen.display.println(I2C_ADDRESS_NAMES.at(addr));
-            } else {
-                screen.display.print("0x");
-                screen.display.println(addr, HEX);
-            }
-        }
-    }
-    screen.display.display();
-    delay(4000);
-}
-
 void processMessage(SerialTransfer &transfer) {
     // use this variable to keep track of how many
     // bytes we've processed from the receive buffer
