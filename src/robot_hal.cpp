@@ -12,6 +12,7 @@ RobotHal::RobotHal(Status &status, TwoWire *twi) : _status(status), wire(twi ? t
     bno = Adafruit_BNO055(55, IMU_ADDR, wire);
 
     initialiseEncoders();
+    _status.battery.averageV = getBatteryVoltage();
 };
 
 bool RobotHal::initialiseMotors() {
@@ -323,4 +324,27 @@ void RobotHal::updateIMU() {
     sensors_event_t orientationData;
     bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
     _status.updateOrientation(orientationData);
+}
+
+void RobotHal::updateBatteryStatus() {
+    //measured battery voltage dips up to 0.5V for brief periods (motor direction change) and
+    // drops ~0.2V when motors are stalled. Time weighting filters them out. 
+    float timeWeighting = 0.1; //fraction of current reading to be used for moving average
+    _status.battery.currentV = getBatteryVoltage();
+    _status.battery.averageV = (1 - timeWeighting) * _status.battery.averageV + timeWeighting * _status.battery.currentV;
+    _status.battery.isLow = _status.battery.averageV < _minBatVoltage;
+}
+
+float RobotHal::getBatteryVoltage() {
+    // TODO - debounce this
+    //reads ADC, interprets it and
+    //returns battery voltage as a float
+    float adcReading, voltage;
+    //AnalogRead returns 10bit fraction of Vdd
+    adcReading = analogRead(TEENSY_PIN_BATT_SENSE) * 3.3 / 1023.0;
+
+    //ADC reads battery via a potential divider of 33k and 10k
+    //but they're wrong/out of spec ((33+10)/10 = 4.3)
+    voltage = adcReading * 3.71;
+    return voltage;
 }

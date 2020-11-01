@@ -41,7 +41,7 @@ class RobotHal {
     void updateEncoders();
 
     void updateSensors();
-
+    void updateBatteryStatus();
     void doI2CScan();
 
    private:
@@ -56,6 +56,9 @@ class RobotHal {
     float _minSpeed = 1;
     float _trackWidth = 136;
     float _travelPerEncoderCount = 0.262;
+    float _minBatVoltage = 11.1;
+
+    float getBatteryVoltage();
 
     VL53L0X sensor;
 

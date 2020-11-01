@@ -16,12 +16,15 @@ class Status {
         Speeds requestedSpeed;
         float averageSpeed;
     } speeds;
-    float averageSpeed;
+    struct
+    {
+        float currentV;
+        float averageV;
+        bool isLow;
+    } battery;
+    
     Pose pose;
     uint32_t missedMotorMessageCount = 0;
-
-    float getBatteryVoltage();
-    bool batteryIsLow();
 
     void incrementMissedMotorCount();
     void resetMissedMotorCount();
@@ -36,8 +39,6 @@ class Status {
 
     GitData git;
 
-   private:
-    float _minBatVoltage = 11.1;
 };
 
 #endif  //_STATUS__H_
