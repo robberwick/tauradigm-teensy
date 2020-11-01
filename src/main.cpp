@@ -112,7 +112,7 @@ void setup() {
     delay(2000);
 
     pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
-    uint32_t buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
+    int32_t buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
     bool shouldRunPost = false;
     if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold) {
         shouldRunPost = true;
