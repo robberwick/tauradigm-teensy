@@ -393,16 +393,6 @@ void navigate(){
     Pose targetWaypoint = route[currentWaypoint];
     float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition); 
     if (distanceToGo < positionTolerance) {
-        MotorSpeeds = deadStop;
-        for (uint8_t t = 0; t < 5; t++) {
-            setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
-            delay(100);
-        }
-        if (currentWaypoint < 3){
-            pickupCube();
-        } else {
-            putDownCube();
-        }
         currentWaypoint += 1;
         uint8_t numOfWaypoints = sizeof(route) / sizeof(route[0]);
         if (currentWaypoint > numOfWaypoints){
@@ -412,8 +402,8 @@ void navigate(){
         }
     } else {
         float speedP = 0.25;
-        float turnP = 25;
-        float maxCorrection = 40;
+        float turnP = 35;
+        float maxCorrection = 21;
         float minSpeed = 50;
         float maxSpeed = 70;
         float headingError = headingToWaypoint(targetWaypoint, currentPosition);

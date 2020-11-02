@@ -8,8 +8,8 @@ struct Pose {
 
 //#define RH_SQUARE // right hand square
 //#define LH_SQUARE // left hand square
-//#define GARDEN_PATH // Up The Garden Path challenge route
-#define TIDY_TOYS // Tidy Up The Toys challenge route
+#define GARDEN_PATH // Up The Garden Path challenge route
+//#define TIDY_TOYS // Tidy Up The Toys challenge route
 
 // right hand square
 #ifdef RH_SQUARE
@@ -35,15 +35,15 @@ struct Pose {
 // Up the Garden Path challenge route
 #ifdef GARDEN_PATH
     Pose route[] = { 
-        {1123, -141},
-        {1197, -428},
-        {975, -589},
-        {779, -532}, 
-        {485, -735},
+        {1023, -141},
+        {1050, -350},
+        {875, -500},
+        {679, -532}, 
+        {385, -735},
         {201, -727},
-        {70, -1008},
-        {325, -1171},
-        {1354, -1354}
+        {70, -808},
+        {325, -971},
+        {1154, -1154}
     };
 #endif
 
