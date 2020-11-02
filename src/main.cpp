@@ -52,6 +52,9 @@ Speeds deadStop = {0, 0};
 
 long lastLoopTime = millis();
 float loopTime = 0;
+long lastPoseLoopTime = millis();
+float poseLoopTime = 0;
+
 uint32_t missedMotorMessageCount = 0;
 
 float minBatVoltage = 11.1;
@@ -403,10 +406,12 @@ void navigate(){
     } else {
         float speedP = 0.25;
         float turnP = 35;
-        float maxCorrection = 21;
+        float turnD = 1;
+        float maxCorrection = 25;
         float minSpeed = 50;
         float maxSpeed = 70;
         float headingError = headingToWaypoint(targetWaypoint, currentPosition);
+        float oldHeadingError = headingToWaypoint(targetWaypoint, previousPosition);
         display.println(" ");
         display.printf("heading: %2.2f", headingError);
         display.display();
@@ -414,6 +419,7 @@ void navigate(){
             MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (distanceToGo*speedP)), minSpeed);
         }
         float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
+        turnSpeed -= turnD * (oldHeadingError - headingError) / poseLoopTime;
         MotorSpeeds.left+=turnSpeed;
         MotorSpeeds.right-=turnSpeed;
     }
@@ -488,6 +494,7 @@ void processMessage(SerialTransfer &transfer) {
                     display.println(F("navigating to next waypoint"));
                     display.display();
                     navigating=true;
+                    currentWaypoint = 0;
                     break;
                 case 'd':
                     display.println(F("stopping navigation"));
@@ -909,6 +916,8 @@ void loop() {
         float distanceMoved = getDistanceTravelled();
         float relativeHeading = orientationReading.x - headingOffset;
         currentPosition = updatePose(previousPosition, relativeHeading, distanceMoved);
+        poseLoopTime = (millis() - lastPoseLoopTime) / 1000.0;  // divide by 1000 converts to seconds.
+        lastPoseLoopTime = millis();
 
         // Prepare the distance data
         payloadSize = myTransfer.txObj(distances, payloadSize);
