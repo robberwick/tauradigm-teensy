@@ -545,14 +545,14 @@ void post() {
     display.display();
     for (uint8_t t = 0; t < 8; t++) {
         tcaselect(t);
-        display.printf("initialising %d", t);
+        display.printf("initing %d", t);
         display.display();
         activeToFSensors[t] = sensor.init();
         display.setCursor(0, display.getCursorY() + 1);
-        display.printf("init %d done", t);
+        display.printf("init %d ok ", t);
 
         if (activeToFSensors[t]) {
-            display.printf("%d: OK", t);
+            display.printf("%d:OK", t);
             sensor.setMeasurementTimingBudget(33000);
             // lower the return signal rate limit (default is 0.25 MCPS)
             sensor.setSignalRateLimit(0.1);
