@@ -393,35 +393,42 @@ float headingToWaypoint(Pose target, Pose current){
 void navigate(){
     Speeds MotorSpeeds;
     float positionTolerance = 100;
+    display.println(" ");
+    display.printf("waypoint: %2.2f", currentWaypoint);
     Pose targetWaypoint = route[currentWaypoint];
     float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition); 
     if (distanceToGo < positionTolerance) {
         currentWaypoint += 1;
         uint8_t numOfWaypoints = sizeof(route) / sizeof(route[0]);
-        if (currentWaypoint > numOfWaypoints){
+        if (currentWaypoint == numOfWaypoints){
             navigating = false;
             currentWaypoint = 0;
             MotorSpeeds = deadStop;
         }
     } else {
         float speedP = 0.25;
-        float turnP = 35;
-        float turnD = 1;
-        float maxCorrection = 25;
+        float turnP = 40;
+        float turnD = 0;  // 1 = too low
+        float maxCorrection = 20;
         float minSpeed = 50;
-        float maxSpeed = 70;
+        float maxSpeed = 50;
         float headingError = headingToWaypoint(targetWaypoint, currentPosition);
-        float oldHeadingError = headingToWaypoint(targetWaypoint, previousPosition);
         display.println(" ");
         display.printf("heading: %2.2f", headingError);
-        display.display();
         if (turnP*headingError < maxCorrection){
             MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (distanceToGo*speedP)), minSpeed);
         }
-        float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
-        turnSpeed -= turnD * (oldHeadingError - headingError) / poseLoopTime;
-        MotorSpeeds.left+=turnSpeed;
-        MotorSpeeds.right-=turnSpeed;
+        float turnDemand = min(max(turnP * headingError, -maxCorrection), maxCorrection);
+        float turnSpeed = wrapTwoPi(previousPosition.heading- currentPosition.heading);
+        float damping = turnD * turnSpeed / poseLoopTime;
+        display.println(" ");
+        display.printf("Turn speed: %2.2f", turnSpeed);
+        display.println(" ");
+        display.printf("Damping: %2.2f", damping);
+        display.display();
+        turnDemand += damping;
+        MotorSpeeds.left+=turnDemand;
+        MotorSpeeds.right-=turnDemand;
     }
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
 }
@@ -839,9 +846,8 @@ void loop() {
     }
     display.clearDisplay();
     display.setCursor(0, 0);
-    display.printf("heading: %2.2f", currentPosition.heading);
-    display.println(" ");
-    display.printf("position: %2.0f, %2.0f", currentPosition.x, currentPosition.y);
+    display.printf("head:%1.1f ", currentPosition.heading);
+    display.printf("pos:%2.0f, %2.0f", currentPosition.x, currentPosition.y);
     display.display();
 
     if (navigating) {
@@ -886,7 +892,7 @@ void loop() {
         for (uint8_t t = 0; t < 8; t++) {
             tcaselect(t);
             if (activeToFSensors[t]) {
-                distances[t] = sensor.readRangeContinuousMillimeters();
+                distances[t] = 0; //sensor.readRangeContinuousMillimeters();
                 if (sensor.timeoutOccurred()) {
                     distances[t] = 0;
                 }
