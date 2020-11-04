@@ -184,7 +184,7 @@ struct Speeds feedForward(struct Speeds targetSpeeds) {
     float minTurnPower = 4;       //determined from practical testing
     float minForwardPower = 5;     //same
     float powerCoefficient = 50;  //same
-    float turnThreshold = 100;     //units: mm/sec. arbitary, value.
+    float turnThreshold = 1000;     //units: mm/sec. arbitary, value.
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
@@ -371,8 +371,8 @@ float distanceToWaypoint(Pose target, Pose current){
     float distance;
     //hypotenuse of dx, dy triangle gives distance, using h^2=x^2+y^2
     distance = sqrt(powf((target.x-current.x),2) + powf((target.y-current.y),2));
-    display.println(" ");
-    display.printf("distance: %2.2f", distance);
+//    display.println(" ");
+//    display.printf("distance: %2.2f", distance);
     return distance;
 }
 
@@ -383,7 +383,11 @@ float headingToWaypoint(Pose target, Pose current){
     if (dy != 0) {
         relativeHeading = (float) atan2(dy, dx);
     } else {
-        relativeHeading = sgn(dy) * M_PI/2;
+        if (dx>0) {
+            relativeHeading = 0;    
+        } else {
+            relativeHeading = M_PI;
+        }
     }
     relativeHeading = wrapTwoPi(relativeHeading - current.heading);
 
@@ -393,40 +397,43 @@ float headingToWaypoint(Pose target, Pose current){
 void navigate(){
     Speeds MotorSpeeds;
     float positionTolerance = 100;
-    display.println(" ");
-    display.printf("waypoint: %2.2f", currentWaypoint);
+    //display.println(" ");
+    //display.printf("waypoint: %d", currentWaypoint);
     Pose targetWaypoint = route[currentWaypoint];
     float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition); 
     if (distanceToGo < positionTolerance) {
         currentWaypoint += 1;
-        uint8_t numOfWaypoints = sizeof(route) / sizeof(route[0]);
-        if (currentWaypoint == numOfWaypoints){
-            navigating = false;
-            currentWaypoint = 0;
-            MotorSpeeds = deadStop;
-        }
+    } 
+    uint8_t numOfWaypoints = sizeof(route) / sizeof(route[0]);
+    if (currentWaypoint == numOfWaypoints){
+        navigating = false;
+        currentWaypoint = 0;
+        MotorSpeeds = deadStop;
     } else {
         float speedP = 0.25;
-        float turnP = 40;
-        float turnD = 0;  // 1 = too low
-        float maxCorrection = 20;
+        float turnP = 60;
+        float turnD = 0;
+        float maxCorrection = 50;
         float minSpeed = 50;
         float maxSpeed = 50;
+        Pose targetWaypoint = route[currentWaypoint];
+        float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition); 
         float headingError = headingToWaypoint(targetWaypoint, currentPosition);
-        display.println(" ");
-        display.printf("heading: %2.2f", headingError);
-        if (turnP*headingError < maxCorrection){
-            MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (distanceToGo*speedP)), minSpeed);
-        }
+    //    display.println(" ");
+        //display.printf("heading error: %1.1f", headingError);
+        //if (turnP*headingError < maxCorrection){
+        //    MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (distanceToGo*speedP)), minSpeed);
+        //}
+        MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (distanceToGo*speedP)), minSpeed);
         float turnDemand = min(max(turnP * headingError, -maxCorrection), maxCorrection);
-        float turnSpeed = wrapTwoPi(previousPosition.heading- currentPosition.heading);
+        float turnSpeed = wrapTwoPi(previousPosition.heading - currentPosition.heading);
         float damping = turnD * turnSpeed / poseLoopTime;
-        display.println(" ");
-        display.printf("Turn speed: %2.2f", turnSpeed);
-        display.println(" ");
-        display.printf("Damping: %2.2f", damping);
-        display.display();
-        turnDemand += damping;
+        //display.println(" ");
+        //display.printf("Turn speed: %2.2f", turnSpeed);
+        //display.println(" ");
+        //display.printf("Damping: %2.2f", damping);
+    //    display.display();
+        turnDemand -= damping;
         MotorSpeeds.left+=turnDemand;
         MotorSpeeds.right-=turnDemand;
     }
@@ -462,38 +469,39 @@ void processMessage(SerialTransfer &transfer) {
             transfer.rxObj(button, sizeof(button), sizeof(messageType));
             switch (button) {
                 case 'c':
-                    esc_1.writeMicroseconds(900);
-                    display.println(F("jaw closing"));
-                    display.display();
-                    delay(200);
+                    {
+                    Pose targetWaypoint = route[currentWaypoint];
+                    float headingError = headingToWaypoint(targetWaypoint, currentPosition);
+                    display.printf("heading error:%1.1f ", headingError);
                     break;
+                    }
                 case 'x':
-                    display.println(F("jaw down"));
+                    display.clearDisplay();
+                    display.setCursor(0, 0);
+                    display.printf(" ");
                     display.display();
-                    putDownCube();
                     break;
                 case 's':
-                    esc_1.writeMicroseconds(1600);
-                    display.println(F("jaw opening"));
+                    display.println(" ");
+                    display.printf("head:%1.1f ", currentPosition.heading);
+                    display.printf("pos:%2.0f, %2.0f", currentPosition.x, currentPosition.y);
                     display.display();
-                    delay(200);
                     break;
                 case 't':
-                    display.println(F("jaw up"));
+                    display.println(" ");
+                    display.printf("waypoint: %d", currentWaypoint);
                     display.display();
-                    pickupCube();
                     break;
                 case 'l':
                     display.println(F("zeroing heading"));
                     display.display();
-                    delay(500);
+                    delay(300);
                     headingOffset = orientationReading.x;
-                    currentPosition.heading=0;
                     break;
                 case 'r':
                     display.println(F("zeroing odometry"));
                     display.display();
-                    delay(500);
+                    delay(300);
                     currentPosition.x=0;
                     currentPosition.y=0;
                     break;
@@ -723,7 +731,7 @@ void setup() {
         (display.height() - LOGO_HEIGHT) / 2,
         logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
     display.display();
-    delay(3000);
+    delay(300);
 
     pinMode(TEENSY_PIN_BUTTON, INPUT_PULLUP);
     display.clearDisplay();
@@ -733,7 +741,7 @@ void setup() {
     display.println("Git commit hash:");
     display.println(GIT_REV);
     display.display();
-    delay(2000);
+    delay(200);
     display.clearDisplay();
     display.setCursor(0, 10);
     display.println("Press button now to  enter POST");
@@ -742,7 +750,7 @@ void setup() {
     float batVoltage = batteryVoltage();
     display.printf("%2.2f V", batVoltage);
     display.display();
-    delay(2000);
+    delay(200);
     int buttonThreshold = 30;  //1024 should be supply voltage, button pulls pin low
     bool enterPost = false;
     if (analogRead(TEENSY_PIN_BUTTON) < buttonThreshold) {
@@ -762,7 +770,7 @@ void setup() {
     display.println("Debug flag is set");
     display.println("Waiting for\nUSB serial");
     display.display();
-    delay(1000);
+    delay(100);
     Serial.begin(115200);
     while (!Serial) {
     };
@@ -840,19 +848,31 @@ void setup() {
 }
 
 void loop() {
+    
+    long mytransferT = 0;
+    long displayT = 0;
+    long navigateT = 0;
+    long adminT = 0;
+    long loggingT = 0;
+    long startTime = micros();
     // Is there an incoming message available?
     if (myTransfer.available()) {
         processMessage(myTransfer);
     }
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.printf("head:%1.1f ", currentPosition.heading);
-    display.printf("pos:%2.0f, %2.0f", currentPosition.x, currentPosition.y);
-    display.display();
-
+    mytransferT = micros() - startTime;
+    startTime = micros();
+    //display.clearDisplay();
+    //display.setCursor(0, 0);
+    //display.printf("head:%1.1f ", currentPosition.heading);
+    //display.printf("pos:%2.0f, %2.0f", currentPosition.x, currentPosition.y);
+    //display.display();
+    displayT = micros() - startTime;
+    startTime = micros();
     if (navigating) {
         navigate();
     }
+    navigateT = micros() - startTime;
+    startTime = micros();
     // if the message sending timeout has passed then increment the missed count
     // and reset
     if (receiveMessage.hasPassed(20)) {
@@ -885,6 +905,8 @@ void loop() {
         setMotorSpeeds(deadStop, motorLeft, motorRight);
     }
 
+    adminT = micros() - startTime;
+    startTime = micros();
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
@@ -941,4 +963,21 @@ void loop() {
         myTransfer.sendData(payloadSize);
     }
 
+    loggingT = micros() - startTime;
+    /*
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.printf("mytransfer:%d ", mytransferT);
+    display.println(" ");
+    display.printf("navigate:%d", navigateT);
+    display.println(" ");
+    display.printf("display:%d ", displayT);
+    display.println(" ");
+    display.printf("admin:%d", adminT);
+    display.println(" ");
+    display.printf("logging:%d", loggingT);
+    display.display();
+    delay(100);
+    */
+    delay(10);
 }
