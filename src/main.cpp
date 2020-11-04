@@ -184,7 +184,7 @@ struct Speeds feedForward(struct Speeds targetSpeeds) {
     float minTurnPower = 4;       //determined from practical testing
     float minForwardPower = 5;     //same
     float powerCoefficient = 50;  //same
-    float turnThreshold = 1000;     //units: mm/sec. arbitary, value.
+    float turnThreshold = 2000;     //units: mm/sec. arbitary, value.
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
@@ -305,7 +305,7 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     // for autonomous control we could revert back to using full scale
     // but for manual control, and for testing speedcontrol precision
     // better to start with limiting to lower speeds
-    float maxspeed_mm_per_sec = 1000;  //max acheivable is ~3200
+    float maxspeed_mm_per_sec = 1800;  //max acheivable is ~3200
     targetMotorSpeeds.right = requestedMotorSpeeds.right * maxspeed_mm_per_sec / 100;
     targetMotorSpeeds.left = requestedMotorSpeeds.left * maxspeed_mm_per_sec / 100;
 
@@ -411,7 +411,7 @@ void navigate(){
         MotorSpeeds = deadStop;
     } else {
         float speedP = 0.25;
-        float turnP = 60;
+        float turnP = 40;
         float turnD = 0;
         float maxCorrection = 50;
         float minSpeed = 50;
@@ -472,7 +472,9 @@ void processMessage(SerialTransfer &transfer) {
                     {
                     Pose targetWaypoint = route[currentWaypoint];
                     float headingError = headingToWaypoint(targetWaypoint, currentPosition);
+                    display.println(" ");
                     display.printf("heading error:%1.1f ", headingError);
+                    display.display();
                     break;
                     }
                 case 'x':
