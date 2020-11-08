@@ -14,14 +14,5 @@ float minMagnitude(float x, float y, float z);
 
 float wrapTwoPi(float angle);
 
-class PID {
-    public:
-      float pGain;
-      float dGain;
-      float iGain;
-      float update(float targetValue, float currentValue, float previousValue, float timeInterval);
-    private:
-      float cumulativeError;
-};
 
 #endif  // _UTILS__H_

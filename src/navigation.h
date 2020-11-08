@@ -1,8 +1,11 @@
 
+#ifndef _NAV__H_
+#define _NAV__H_
+
 #include "utils.h"
 #include "types.h"
 
-// M_PI
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+float headingToWaypoint(Pose target, Pose current);
+float distanceToWaypoint(Pose target, Pose current);
+
+#endif //_NAV_H

@@ -1,5 +1,7 @@
 #ifndef _TYPES__H_
 #define _TYPES__H_
+#include <Adafruit_Sensor.h>
+#include <stdint.h>
 
 struct OrientationReading {
     float x = 0;
