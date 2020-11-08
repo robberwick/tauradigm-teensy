@@ -20,6 +20,8 @@ class PID {
       float dGain;
       float iGain;
       float update(float targetValue, float currentValue, float previousValue, float timeInterval);
+    private:
+      float cumulativeError;
 };
 
 #endif  // _UTILS__H_
