@@ -238,7 +238,7 @@ void loop() {
 
     if (state == AUTO){
         Speeds requestedMotorSpeeds;
-        requestedMotorSpeeds = navigation.update(robotStatus.pose, 0.02);
+        requestedMotorSpeeds = navigation.update(robotStatus.pose, robotStatus.previousOrientation.x, 0.02);
         hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
         robotStatus.waypointPose = navigation.currentPose;
     }

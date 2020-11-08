@@ -274,8 +274,11 @@ void Screen::showWaypoints() {
     display.println("Navigating Waypoints");
     display.printf("Battery: %2.2f V", _status.getBatteryVoltage());
     display.println(" ");
-    display.printf("Pose:");
+    display.printf("W Pose:");
     display.printf("%1.1f, %3.0f, %3.0f", _status.waypointPose.heading, _status.waypointPose.x, _status.waypointPose.y);
+    display.println(" ");
+    display.printf("A Pose:");
+    display.printf("%1.1f, %3.0f, %3.0f", _status.pose.heading, _status.pose.x, _status.pose.y);
     display.println(" ");
     display.printf("Waypoint #%d", _status.waypointNumber);
 }
