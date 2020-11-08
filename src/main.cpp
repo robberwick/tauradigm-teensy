@@ -18,6 +18,9 @@
 #include "status.h"
 #include "types.h"
 #include "utils.h"
+#include "waypoint_navigation.h"
+#include "routes.h"
+
 
 Status robotStatus = Status();
 
@@ -28,6 +31,8 @@ HardwareSerial Serial2(USART2);
 #endif
 
 RobotHal hal(robotStatus);
+WaypointNav navigation(route, sizeof(route)/sizeof(Pose));
+controlMode state = RC;
 
 SerialTransfer myTransfer;
 
@@ -60,14 +65,32 @@ void processMessage(SerialTransfer &transfer) {
     switch (messageType) {
         // 0 - motor speed message
         case 1:
-        default:
+            {
             Speeds requestedMotorSpeeds;
             transfer.rxObj(requestedMotorSpeeds, recSize);
-            hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
+            if (state == RC){
+                hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
+            }
             // reset the missed motor mdessage count
             robotStatus.resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessageTimeout.restart();
+            break;
+            }
+        case 2:
+            char button;
+            transfer.rxObj(button, sizeof(button), sizeof(messageType));
+            switch (button) {
+                case 'u':
+                    state = AUTO;
+                    break;
+                case 'd':
+                    state = RC;
+                    break;
+            }
+            break;
+        default:
+           break;
     }
 }
 
@@ -197,6 +220,13 @@ void setup() {
 }
 
 void loop() {
+
+    if (state == AUTO){
+        Speeds requestedMotorSpeeds;
+        requestedMotorSpeeds = navigation.update(robotStatus.pose, 0.02);
+        hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
+    }
+
     // Do we need to update the various sensors?
     if (updateEncodersTimeout.hasPassed(UPDATE_ENCODER_TIMEOUT_MS)) {
         // Read Encoder counts

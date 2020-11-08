@@ -50,4 +50,9 @@ struct GitData {
     char commit[8] = GIT_REV;
 };
 
+enum controlMode {
+    RC,
+    AUTO
+};
+
 #endif  // _TYPES__H_
