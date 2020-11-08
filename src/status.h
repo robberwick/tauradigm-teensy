@@ -18,6 +18,8 @@ class Status {
     } speeds;
     float averageSpeed;
     Pose pose;
+    Pose waypointPose;
+    uint8_t waypointNumber;
     uint32_t missedMotorMessageCount = 0;
 
     float getBatteryVoltage();

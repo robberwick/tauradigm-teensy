@@ -83,9 +83,24 @@ void processMessage(SerialTransfer &transfer) {
             switch (button) {
                 case 'u':
                     state = AUTO;
+                    navigation.currentWaypoint = 0;
+                    navigation.finished = false;
+                    screen.setMode(Screen::Mode::WAYPOINTS);
+                    screen.showScreen();
                     break;
                 case 'd':
                     state = RC;
+                    screen.setMode(Screen::Mode::RUNNING);
+                    screen.showScreen();
+                    break;
+                case 'l':
+                    //zero heading
+                    navigation.poseOffset.heading = robotStatus.pose.heading;
+                    break;
+                case 'r':
+                    //zero position
+                    navigation.poseOffset.x = robotStatus.pose.x;
+                    navigation.poseOffset.y = robotStatus.pose.y;
                     break;
             }
             break;
@@ -225,6 +240,7 @@ void loop() {
         Speeds requestedMotorSpeeds;
         requestedMotorSpeeds = navigation.update(robotStatus.pose, 0.02);
         hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
+        robotStatus.waypointPose = navigation.currentPose;
     }
 
     // Do we need to update the various sensors?
@@ -268,7 +284,11 @@ void loop() {
         // Set motors to dead stop
         hal.stopMotors();
     } else {
-        screen.setMode(Screen::Mode::RUNNING);
+        if (state == AUTO){
+            screen.setMode(Screen::Mode::WAYPOINTS);
+        } else {
+            screen.setMode(Screen::Mode::RUNNING);
+        }
         screen.showScreen();
     }
 

@@ -71,6 +71,7 @@ class Screen {
         SENSOR_DATA,
         TIMING,
         ERROR,
+        WAYPOINTS,
     };
     bool initDisplay();
     void setMode(Screen::Mode mode);
@@ -100,6 +101,7 @@ class Screen {
     void showSensorData();
     void showTiming();
     void showError();
+    void showWaypoints();
 };
 
 #endif  //  SCREEN__H_

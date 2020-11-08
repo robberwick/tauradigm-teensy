@@ -116,6 +116,10 @@ void Screen::showScreen() {
         case Mode::ERROR:
             showError();
             break;
+            
+        case Mode::WAYPOINTS:
+            showWaypoints();
+            break;
             // flush changes to the display
     }
     display.display();
@@ -264,4 +268,14 @@ void Screen::showDebugWarning() {
     display.println("");
     display.println("Debug flag is set");
     display.println("Waiting for\nUSB serial");
+}
+
+void Screen::showWaypoints() {
+    display.println("Navigating Waypoints");
+    display.printf("Battery: %2.2f V", _status.getBatteryVoltage());
+    display.println(" ");
+    display.printf("Pose:");
+    display.printf("%1.1f, %3.0f, %3.0f", _status.waypointPose.heading, _status.waypointPose.x, _status.waypointPose.y);
+    display.println(" ");
+    display.printf("Waypoint #%d", _status.waypointNumber);
 }
