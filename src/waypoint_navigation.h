@@ -17,6 +17,7 @@ class WaypointNav {
       float positionTolerance;
       float distanceToGo;
       float previousHeadingError;
+      float headingError;
       Pose poseOffset; //offset between robot coordiante system and waypoint coordinate system
       Pose currentPose; //Pose within waypoint navigation coordinate system
       Pose targetWaypoint;

@@ -42,6 +42,7 @@ Chrono sendSensorDataTimeout;
 Chrono updateIMUTimeout;
 Chrono updateTOFTimeout;
 Chrono updateEncodersTimeout;
+Chrono challengeTimeout;
 
 int16_t lightSensors[4];
 
@@ -236,11 +237,15 @@ void setup() {
 
 void loop() {
 
-    if (state == AUTO){
+    if ((state == AUTO) && (challengeTimeout.hasPassed(UPDATE_CHALLENGE_TIMEOUT_MS))){
         Speeds requestedMotorSpeeds;
         requestedMotorSpeeds = navigation.update(robotStatus.pose, robotStatus.previousOrientation.x, 0.02);
         hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
         robotStatus.waypointPose = navigation.currentPose;
+        robotStatus.wayDist = navigation.distanceToGo;
+        robotStatus.wayHead = navigation.headingError;
+        robotStatus.numWaypoints = navigation.numOfWaypoints;
+        challengeTimeout.restart();
     }
 
     // Do we need to update the various sensors?

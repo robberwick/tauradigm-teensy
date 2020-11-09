@@ -52,14 +52,14 @@ Speeds WaypointNav::update(Pose currentPosition, float previousHeading, float lo
         motorSpeeds.left = motorSpeeds.right = 0; //would be better to set to deadstop
     } else {
         //otherwise keep navigating
-        float headingError = headingToWaypoint(targetWaypoint, currentPose);
+        headingError = headingToWaypoint(targetWaypoint, currentPose);
         float previousError = headingError - (currentPosition.heading - previousHeading);  //fudgy
-        float turnCorrection = headingPID.update(0, headingError, previousError, loopTime);
+        float turnCorrection = headingPID.update(0.0, headingError, previousError, loopTime);
         turnCorrection = min(max(turnCorrection, -maxCorrection), maxCorrection);
         
-        //don't both with speedPID for now
-        motorSpeeds.left = motorSpeeds.right = minSpeed;
-
+        //don't bother with speedPID for now
+        motorSpeeds.left = minSpeed;
+        motorSpeeds.right = minSpeed;
         motorSpeeds.left+=turnCorrection;
         motorSpeeds.right-=turnCorrection;
     }
