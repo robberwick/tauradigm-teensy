@@ -5,6 +5,7 @@ WaypointNav::WaypointNav(Pose* RouteToNav, uint8_t NumPoints){
     headingPID.pGain = 40;
     headingPID.iGain = 0;
     headingPID.dGain = 0;
+    headingPID.piWrapping = true;
     speedPID.pGain = 0.25;
     speedPID.iGain = 0;
     speedPID.dGain = 0;

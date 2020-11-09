@@ -6,6 +6,9 @@ float PID::update(float targetValue, float currentValue, float previousValue, fl
     // to calcualte the response for a given error from target
     // values floats
     float error = currentValue - targetValue;
+    if (piWrapping) {
+        error = wrapTwoPi(error);
+    }
     float change = currentValue - previousValue;
     cumulativeError += error;
     float output = pGain * error - dGain * change / timeInterval + iGain * cumulativeError;
