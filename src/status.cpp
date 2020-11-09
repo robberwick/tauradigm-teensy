@@ -40,6 +40,7 @@ Pose Status::updatePose(float heading, float distanceTravelled) {
     // determine new position based on heading and distance travelled
     pose.x = pose.x + distanceTravelled * cos(heading);
     pose.y = pose.y + distanceTravelled * sin(heading);
+    pose.heading = heading;
     return pose;
 }
 
