@@ -18,6 +18,8 @@
 #include "status.h"
 #include "types.h"
 #include "utils.h"
+#include "waypoint_navigation.h"
+#include "routes.h"
 
 Status robotStatus = Status();
 
@@ -28,6 +30,8 @@ HardwareSerial Serial2(USART2);
 #endif
 
 RobotHal hal(robotStatus);
+WaypointNav navigation(route, sizeof(route)/sizeof(Pose));
+controlMode state = RC;
 
 SerialTransfer myTransfer;
 
@@ -37,6 +41,7 @@ Chrono sendSensorDataTimeout;
 Chrono updateIMUTimeout;
 Chrono updateTOFTimeout;
 Chrono updateEncodersTimeout;
+Chrono challengeTimeout;
 
 int16_t lightSensors[4];
 
@@ -60,14 +65,47 @@ void processMessage(SerialTransfer &transfer) {
     switch (messageType) {
         // 0 - motor speed message
         case 1:
-        default:
+            {
             Speeds requestedMotorSpeeds;
             transfer.rxObj(requestedMotorSpeeds, recSize);
-            hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
+            if (state == RC){
+                hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
+            }
             // reset the missed motor mdessage count
             robotStatus.resetMissedMotorCount();
             // We received a valid motor command, so reset the timer
             receiveMessageTimeout.restart();
+            break;
+            }
+        case 2:
+            char button;
+            transfer.rxObj(button, sizeof(button), sizeof(messageType));
+            switch (button) {
+                case 'u':
+                    state = AUTO;
+                    navigation.currentWaypoint = 0;
+                    navigation.finished = false;
+                    screen.setMode(Screen::Mode::WAYPOINTS);
+                    screen.showScreen();
+                    break;
+                case 'd':
+                    state = RC;
+                    screen.setMode(Screen::Mode::RUNNING);
+                    screen.showScreen();
+                    break;
+                case 'l':
+                    //zero heading by setting offset
+                    robotStatus.headingOffset = robotStatus.orientation.x;
+                    break;
+                case 'r':
+                    //zero position
+                    robotStatus.pose.x = 0;
+                    robotStatus.pose.y = 0;
+                    break;
+            }
+            break;
+        default:
+           break;
     }
 }
 
@@ -197,10 +235,30 @@ void setup() {
 }
 
 void loop() {
+
+    if ((state == AUTO) && (challengeTimeout.hasPassed(UPDATE_CHALLENGE_TIMEOUT_MS))){
+        Speeds requestedMotorSpeeds;
+        requestedMotorSpeeds = navigation.update(robotStatus.pose, robotStatus.previousOrientation.x, 0.02);
+        hal.setRequestedMotorSpeeds(requestedMotorSpeeds);
+        robotStatus.wayDist = navigation.distanceToGo;
+        robotStatus.wayHead = navigation.headingError;
+        robotStatus.numWaypoints = navigation.numOfWaypoints;
+        robotStatus.waypointNumber = navigation.currentWaypoint;
+        robotStatus.targetPose = navigation.targetWaypoint;
+        challengeTimeout.restart();
+    }
+
     // Do we need to update the various sensors?
     if (updateEncodersTimeout.hasPassed(UPDATE_ENCODER_TIMEOUT_MS)) {
         // Read Encoder counts
         hal.updateEncoders();
+
+        //update odometry
+        float distanceMoved = hal.getDistanceTravelled();
+        // Update pose based on current heading and distance moved
+        // ensure that the orientation data has been updated first
+        // TODO tidy this up
+        robotStatus.updatePose(robotStatus.orientation.x, distanceMoved);
         // restart timer
         updateEncodersTimeout.restart();
     }
@@ -238,20 +296,17 @@ void loop() {
         // Set motors to dead stop
         hal.stopMotors();
     } else {
-        screen.setMode(Screen::Mode::RUNNING);
+        if (state == AUTO){
+            screen.setMode(Screen::Mode::WAYPOINTS);
+        } else {
+            screen.setMode(Screen::Mode::RUNNING);
+        }
         screen.showScreen();
     }
 
     if (sendSensorDataTimeout.hasPassed(SEND_SENSOR_DATA_TIMEOUT_MS)) {
         sendSensorDataTimeout.restart();
         uint16_t payloadSize = 0;
-
-        //update odometry
-        float distanceMoved = hal.getDistanceTravelled();
-        // Update pose based on current heading and distance moved
-        // ensure that the orientation data has been updated first
-        // TODO tidy this up
-        robotStatus.updatePose(robotStatus.orientation.x, distanceMoved);
 
         // Prepare the distance data
         payloadSize = myTransfer.txObj(robotStatus.sensors.tofDistances, payloadSize);
@@ -271,4 +326,5 @@ void loop() {
 
     // Update motor speeds
     hal.updateMotorSpeeds();
+    delay(5);
 }

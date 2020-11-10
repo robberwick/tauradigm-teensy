@@ -116,6 +116,10 @@ void Screen::showScreen() {
         case Mode::ERROR:
             showError();
             break;
+            
+        case Mode::WAYPOINTS:
+            showWaypoints();
+            break;
             // flush changes to the display
     }
     display.display();
@@ -264,4 +268,16 @@ void Screen::showDebugWarning() {
     display.println("");
     display.println("Debug flag is set");
     display.println("Waiting for\nUSB serial");
+}
+
+void Screen::showWaypoints() {
+    display.println("Navigating Waypoints");
+    display.printf("Pose:");
+    display.printf("%1.1f,%3.0f,%3.0f", _status.pose.heading, _status.pose.x, _status.pose.y);
+    display.println(" ");
+    display.printf("Waypoint #%d / %d", _status.waypointNumber,_status.numWaypoints);
+    display.println(" ");
+    display.printf("dist:%3.0f, head:%1.1f", _status.wayDist, _status.wayHead);
+    display.println(" ");
+    display.printf("target: %3.0f, %3.0f", _status.targetPose.x, _status.targetPose.y);
 }

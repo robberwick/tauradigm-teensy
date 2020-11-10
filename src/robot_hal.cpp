@@ -85,7 +85,7 @@ Speeds RobotHal::feedForward(Speeds targetSpeeds) {
 
     // since there's a min power needed to move (as defined above)
     // first check if we're trying to move
-    if (targetSpeeds.left != 0 and targetSpeeds.right != 0) {
+    if ((targetSpeeds.left != 0) || (targetSpeeds.right != 0)) {
         //then check if we're trying to turn or not, i.e. left and right speeds different
         if (abs(targetSpeeds.right - targetSpeeds.left) > turnThreshold) {
             //then predict power needed to acheive that speed. formule derived from curve fitting experimental results

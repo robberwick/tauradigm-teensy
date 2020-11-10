@@ -14,4 +14,5 @@ float minMagnitude(float x, float y, float z);
 
 float wrapTwoPi(float angle);
 
+
 #endif  // _UTILS__H_
