@@ -18,7 +18,8 @@ class Status {
     } speeds;
     float averageSpeed;
     Pose pose;
-    Pose waypointPose;
+    float headingOffset;
+    Pose targetPose;
     uint8_t waypointNumber;
     uint8_t numWaypoints;
     float wayHead;

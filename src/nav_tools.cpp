@@ -4,13 +4,13 @@ float headingToWaypoint(Pose target, Pose current){
     float dx, dy, relativeHeading;
     dx = target.x-current.x;
     dy = target.y-current.y;
-    if (dy != 0) {
+    if (dx != 0) {
         relativeHeading = (float) atan2(dy, dx);
     } else {
-        if (dx>0) {
-            relativeHeading = 0;    
+        if (dy>0) {
+            relativeHeading = -M_PI/2;    
         } else {
-            relativeHeading = M_PI;
+            relativeHeading = M_PI/2;
         }
     }
     relativeHeading = wrapTwoPi(relativeHeading - current.heading);
