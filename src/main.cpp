@@ -18,6 +18,7 @@
 #include "status.h"
 #include "types.h"
 #include "utils.h"
+#include "feed_the_fish.h"
 
 Status robotStatus = Status();
 
@@ -194,9 +195,11 @@ void setup() {
         screen.showScreen();
         delay(500);
     }
+    challengeSetup();
 }
 
 void loop() {
+    challengeHandler();
     // Do we need to update the various sensors?
     if (updateEncodersTimeout.hasPassed(UPDATE_ENCODER_TIMEOUT_MS)) {
         // Read Encoder counts
