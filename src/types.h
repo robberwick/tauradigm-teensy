@@ -1,3 +1,6 @@
+#include <stdint.h>
+#include <Adafruit_Sensor.h>
+
 #ifndef _TYPES__H_
 #define _TYPES__H_
 

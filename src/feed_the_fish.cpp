@@ -26,26 +26,33 @@ void ballLoaderEase(int firstValue, int secondValue, int step){
 
 void challengeHandler(){
     while (true){
-        ballLoader.writeMicroseconds(ballLoaderDefault);
-        delay(15000);
         ballLoader.writeMicroseconds(ballLoaderDefault+5);
-        delay(5000);
+        delay(3000);
         fireSolenoid(firingTime);
-        ballLoaderEase(ballLoaderDefault, ballLoaderLoadRowOne, ballLoadingStep);
+        ballLoaderEase(ballLoaderDefault, ballLoaderMidTravel, ballMidTravelStep);
+        ballLoaderEase(ballLoaderMidTravel, ballLoaderLoadRowOne, ballLoadingStep);
         ballLoader.writeMicroseconds(ballLoaderLoadRowOne);
         delay(ballSettlingTime);
         ballLoaderEase(ballLoaderLoadRowOne, ballLoaderDefault, ballLoadingStep);
         ballLoader.writeMicroseconds(ballLoaderDefault);
         delay(ballSettlingTime);
         fireSolenoid(firingTime);
-        ballLoaderEase(ballLoaderDefault, ballLoaderLoadRowTwo, ballLoadingStep);
+        ballLoaderEase(ballLoaderDefault, ballLoaderMidTravel, ballMidTravelStep);
+        ballLoaderEase(ballLoaderMidTravel, ballLoaderLoadRowTwo, ballLoadingStep);
         ballLoader.writeMicroseconds(ballLoaderLoadRowTwo);
         delay(ballSettlingTime);
         fireSolenoid(firingTime);
+        delay(11000);
+        ballLoaderEase(ballLoaderLoadRowTwo, ballLoaderLoadRowOne, ballReloadingStep);
+        ballLoader.writeMicroseconds(ballLoaderLoadRowOne);
+        delay(11000);
+        ballLoaderEase(ballLoaderLoadRowOne, ballLoaderDefault, ballReloadingStep);
+        ballLoader.writeMicroseconds(ballLoaderDefault);
+        delay(11000);
     }
 }
 
-void fireSolenoid(int duration)
+void fireSolenoid(float duration)
 {
     digitalWrite(solenoidPin, LOW);
     delay(duration);
