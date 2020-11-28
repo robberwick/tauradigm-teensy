@@ -18,6 +18,7 @@ class RobotHal {
     struct Motors {
         Servo left;
         Servo right;
+        Servo vortex;
     } motors;
 
     bool initialiseMotors();
@@ -52,7 +53,7 @@ class RobotHal {
     Status &_status;
     TwoWire *wire;
 
-    Speeds _deadStop = {0, 0};
+    Speeds _deadStop = {0, 0, -100};
     float _minSpeed = 1;
     float _trackWidth = 136;
     float _travelPerEncoderCount = 0.262;

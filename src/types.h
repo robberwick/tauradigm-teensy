@@ -1,5 +1,7 @@
 #ifndef _TYPES__H_
 #define _TYPES__H_
+#include <stdint.h>
+#include <Adafruit_Sensor.h>
 
 struct OrientationReading {
     float x = 0;
@@ -41,6 +43,7 @@ struct ActivationStatus {
 struct Speeds {
     float left = 0.0;
     float right = 0.0;
+    float vortex = 0.0;
 };
 
 struct GitData {

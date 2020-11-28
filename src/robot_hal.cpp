@@ -18,6 +18,7 @@ bool RobotHal::initialiseMotors() {
     // attach motors and set to dead stop
     motors.left.attach(TEENSY_PIN_DRIVE_LEFT);
     motors.right.attach(TEENSY_PIN_DRIVE_RIGHT);
+    motors.vortex.attach(TEENSY_PIN_RH_BALL_ESC);
     stopMotors();
     return true;
 };
@@ -62,9 +63,11 @@ void RobotHal::updateMotorSpeeds() {
 
     // save the current commanded motor speeds to the status obj
     _status.speeds.currentSpeed = commandMotorSpeeds;
+    _status.speeds.currentSpeed.vortex = _status.speeds.requestedSpeed.vortex;
 
     motors.left.writeMicroseconds(map(commandMotorSpeeds.left, -100, 100, 1000, 2000));
     motors.right.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
+    motors.vortex.writeMicroseconds(map(_status.speeds.requestedSpeed.vortex, -100, 100, 1000, 2000));
 }
 
 Speeds RobotHal::feedForward(Speeds targetSpeeds) {
