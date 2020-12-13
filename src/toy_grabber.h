@@ -19,8 +19,9 @@ class ToyGrabber {
         RUN
     };
 
-    void requestState(State requestedState);
     State getState();
+    void run();
+    void stop();
 
     void update();
 
@@ -29,5 +30,5 @@ class ToyGrabber {
     Lifter _lifter;
 
     State _currentState;
-    State _requestedState;
+    Command _requestedCommand;
 };

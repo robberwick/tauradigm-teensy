@@ -10,28 +10,45 @@ ToyGrabber::~ToyGrabber() {
 }
 
 void ToyGrabber::update() {
-    switch(_currentState) {
+    _jaws.update();
+    _lifter.update();
+    switch (_currentState) {
         case ToyGrabber::State::WAIT:
+            if (_requestedCommand == ToyGrabber::Command::RUN) {
+                _currentState = ToyGrabber::State::GRABBING;
+                _jaws.open();
+            }
             break;
-
-        case ToyGrabber::State::GRABBING:
-            break;
-
-        case ToyGrabber::State::LIFTING:
+        case ToyGrabber::State::OPENING:
+            if (_jaws.getStatus() == Jaws::Status::OPEN) {
+                _currentState = ToyGrabber::State::LOWERING;
+                _lifter.down();
+            }
             break;
 
         case ToyGrabber::State::LOWERING:
+            if (_lifter.getStatus() == Lifter::Status::DOWN) {
+                _currentState = ToyGrabber::State::GRABBING;
+                _jaws.close();
+            }
             break;
 
-        case ToyGrabber::State::OPENING:
+        case ToyGrabber::State::GRABBING:
+            if (_jaws.getStatus() == Jaws::Status::CLOSED) {
+                _lifter.up();
+                _currentState = ToyGrabber::State::LIFTING;
+            }
+            break;
+        case ToyGrabber::State::LIFTING:
+            _currentState = ToyGrabber::State::WAIT;
             break;
     }
 }
 
-void ToyGrabber::requestState(ToyGrabber::State requestedState) {
-    _requestedState = requestedState;
-}
-
 ToyGrabber::State ToyGrabber::getState() {
     return _currentState;
+}
+
+void ToyGrabber::run() {
+    _requestedCommand = ToyGrabber::Command::RUN;
 }
