@@ -5,4 +5,5 @@ SpaceBeforeParens: 'Never'
 BreakConstructorInitializers: 'BeforeColon'
 IndentWidth: '4'
 IndentCaseLabels: 'true'
+SpaceBeforeParens: ControlStatements
 ...
