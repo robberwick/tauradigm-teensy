@@ -7,21 +7,23 @@ class ToyGrabber {
     ~ToyGrabber();
 
     enum class State {
-        WAIT = 0,
-        OPENING = 1,
-        GRABBING = 2,
-        LOWERING = 3,
-        LIFTING = 4,
+        WAIT,
+        OPENING,
+        GRABBING,
+        LOWERING,
+        LIFTING,
+        DEPOSITING,
     };
 
     enum class Command {
-        STOP,
-        RUN
+        PICKUP,
+        DEPOSIT
     };
 
     State getState();
-    void run();
-    void stop();
+    void begin();
+    void pickup();
+    void deposit();
 
     void update();
 

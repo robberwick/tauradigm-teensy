@@ -9,27 +9,48 @@ ToyGrabber::ToyGrabber(uint8_t jawsPin, uint8_t lifterPin) : _jaws(jawsPin), _li
 ToyGrabber::~ToyGrabber() {
 }
 
+void ToyGrabber::begin() {
+    _lifter.begin();
+    _lifter.down();
+
+    _jaws.begin();
+    _jaws.open();
+}
+
 void ToyGrabber::update() {
     _jaws.update();
     _lifter.update();
     switch (_currentState) {
         case ToyGrabber::State::WAIT:
-            if (_requestedCommand == ToyGrabber::Command::RUN) {
+            if (_requestedCommand == ToyGrabber::Command::PICKUP) {
                 _currentState = ToyGrabber::State::GRABBING;
                 _jaws.open();
+            } else if (_requestedCommand == ToyGrabber::Command::DEPOSIT) {
+                _currentState = ToyGrabber::State::LOWERING;
+                _lifter.down();
             }
+
             break;
         case ToyGrabber::State::OPENING:
             if (_jaws.getStatus() == Jaws::Status::OPEN) {
-                _currentState = ToyGrabber::State::LOWERING;
-                _lifter.down();
+                if (_requestedCommand == ToyGrabber::Command::PICKUP) {
+                    _currentState = ToyGrabber::State::LOWERING;
+                    _lifter.down();
+                } else if (_requestedCommand == ToyGrabber::Command::DEPOSIT) {
+                    _currentState = ToyGrabber::State::WAIT;
+                }
             }
             break;
 
         case ToyGrabber::State::LOWERING:
             if (_lifter.getStatus() == Lifter::Status::DOWN) {
-                _currentState = ToyGrabber::State::GRABBING;
-                _jaws.close();
+                if (_requestedCommand == ToyGrabber::Command::PICKUP) {
+                    _currentState = ToyGrabber::State::GRABBING;
+                    _jaws.close();
+                } else if (_requestedCommand == ToyGrabber::Command::DEPOSIT) {
+                    _currentState = ToyGrabber::State::OPENING;
+                    _jaws.open();
+                }
             }
             break;
 
@@ -49,6 +70,11 @@ ToyGrabber::State ToyGrabber::getState() {
     return _currentState;
 }
 
-void ToyGrabber::run() {
-    _requestedCommand = ToyGrabber::Command::RUN;
+void ToyGrabber::pickup() {
+    _requestedCommand = ToyGrabber::Command::PICKUP;
+}
+
+void ToyGrabber::deposit() {
+    // TODO - what do we want to do here? do we care?
+    _requestedCommand = ToyGrabber::Command::DEPOSIT;
 }
