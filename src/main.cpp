@@ -18,6 +18,7 @@
 #include "config.h"
 #include "graphics.h"
 #include "routes.h"
+#include "toy_grabber.h"
 
 // #define DEBUG
 
@@ -27,8 +28,11 @@ HardwareSerial Serial2(USART2);
 
 Servo motorLeft;
 Servo motorRight;
-Servo esc_1;
-Servo esc_2;
+// Servo esc_1;
+// Servo esc_2;
+
+ToyGrabber toyGrabber(TEENSY_PIN_LH_BALL_ESC,TEENSY_PIN_RH_BALL_ESC);
+
 /*
 struct Pose {
     float heading;
@@ -316,7 +320,7 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 
     // check if the command speed has been close to zero for a while
     // if it is, we're probably are stopped and want to be stopped
-    averageSpeed = 0.5 * averageSpeed + 0.5 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right)); 
+    averageSpeed = 0.5 * averageSpeed + 0.5 * (abs(commandMotorSpeeds.left) + abs(commandMotorSpeeds.right));
 
     //if its been zero for a while, just stop, else work out the PID modified speeds
     //not applying PID when stopped, stops the motors going crazy if the robot is carried
@@ -332,26 +336,29 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
 
 void pickupCube() {
     //open jaw
-    esc_1.writeMicroseconds(1600);
-    delay(400);
-    //jaw down
-    esc_2.writeMicroseconds(1300);
-    delay(500);
-    //close jaw
-    esc_1.writeMicroseconds(900);
-    delay(400);
-    //jaw up
-    esc_2.writeMicroseconds(2100);
+    // esc_1.writeMicroseconds(1600);
+    // delay(400);
+    // //jaw down
+    // esc_2.writeMicroseconds(1300);
+    // delay(500);
+    // //close jaw
+    // esc_1.writeMicroseconds(900);
+    // delay(400);
+    // //jaw up
+    // esc_2.writeMicroseconds(2100);
+    toyGrabber.pickup();
 }
 
 void putDownCube(){
-    //jaw down
-    esc_2.writeMicroseconds(1300);
-    delay(500);
-    //open jaw
-    esc_1.writeMicroseconds(1600);
-    delay(500);
-    //back up
+    // //jaw down
+    // esc_2.writeMicroseconds(1300);
+    // delay(500);
+    // //open jaw
+    // esc_1.writeMicroseconds(1600);
+    // delay(500);
+    toyGrabber.deposit();
+
+    // //back up
     Speeds MotorSpeeds;
     MotorSpeeds.left = MotorSpeeds.right = -40;
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
@@ -364,7 +371,7 @@ void putDownCube(){
 }
 
 float distanceToWaypoint(Pose target, Pose current){
-    //returns distance 'as the crow flies' to the target pose 
+    //returns distance 'as the crow flies' to the target pose
     float distance;
     //hypotenuse of dx, dy triangle gives distance, using h^2=x^2+y^2
     distance = sqrt(powf((target.x-current.x),2) + powf((target.y-current.y),2));
@@ -391,7 +398,7 @@ void navigate(){
     Speeds MotorSpeeds;
     float positionTolerance = 100;
     Pose targetWaypoint = route[currentWaypoint];
-    float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition); 
+    float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition);
     if (distanceToGo < positionTolerance) {
         MotorSpeeds = deadStop;
         for (uint8_t t = 0; t < 5; t++) {
@@ -458,25 +465,25 @@ void processMessage(SerialTransfer &transfer) {
             char button;
             transfer.rxObj(button, sizeof(button), sizeof(messageType));
             switch (button) {
-                case 'c':
-                    esc_1.writeMicroseconds(900);
-                    display.println(F("jaw closing"));
-                    display.display();
-                    delay(200);
-                    break;
+                // case 'c':
+                //     esc_1.writeMicroseconds(900);
+                //     display.println(F("jaw closing"));
+                //     display.display();
+                //     delay(200);
+                //     break;
                 case 'x':
-                    display.println(F("jaw down"));
+                    display.println(F("deposit cube"));
                     display.display();
                     putDownCube();
                     break;
-                case 's':
-                    esc_1.writeMicroseconds(1600);
-                    display.println(F("jaw opening"));
-                    display.display();
-                    delay(200);
-                    break;
+                // case 's':
+                //     esc_1.writeMicroseconds(1600);
+                //     display.println(F("jaw opening"));
+                //     display.display();
+                //     delay(200);
+                //     break;
                 case 't':
-                    display.println(F("jaw up"));
+                    display.println(F("pickup cube"));
                     display.display();
                     pickupCube();
                     break;
@@ -509,7 +516,7 @@ void processMessage(SerialTransfer &transfer) {
         default:
             display.printf("invalid message type received %i", messageType);
             display.display();
-            delay(500);        
+            delay(500);
     }
 }
 
@@ -774,8 +781,10 @@ void setup() {
         // Attach motors
         motorLeft.attach(TEENSY_PIN_DRIVE_LEFT);
         motorRight.attach(TEENSY_PIN_DRIVE_RIGHT);
-        esc_1.attach(TEENSY_PIN_LH_BALL_ESC);
-        esc_2.attach(TEENSY_PIN_RH_BALL_ESC);
+        // esc_1.attach(TEENSY_PIN_LH_BALL_ESC);
+        // esc_2.attach(TEENSY_PIN_RH_BALL_ESC);
+        // init toygrabber
+        toyGrabber.begin();
 
         // Set motors to stop
         setMotorSpeeds(deadStop, motorLeft, motorRight);
@@ -836,6 +845,9 @@ void setup() {
 }
 
 void loop() {
+    // tick the toygrabber fsm
+    toyGrabber.update();
+
     // Is there an incoming message available?
     if (myTransfer.available()) {
         processMessage(myTransfer);
@@ -860,7 +872,7 @@ void loop() {
     bool shouldInvertDisplay = false;
     // Have we missed 10 valid motor messages?
 
-    
+
     if (missedMotorMessageCount >= 10) {
         shouldInvertDisplay = true;
         display.printf("missed message %d", missedMotorMessageCount);
