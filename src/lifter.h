@@ -24,11 +24,11 @@ class Lifter {
    private:
     uint8_t _pin;
     Servo _servo;
-    uint16_t _degUp = 55;
-    uint16_t _degDown = 123;
+    uint16_t _valueUp = 2100;
+    uint16_t _valueDown = 1300;
     Status _status;
     uint32_t _startMillis;
-    uint32_t _servoDelay = 100;  // ms delay to wait for servo to settle after commanding a move
+    uint32_t _servoDelay = 500;  // ms delay to wait for servo to settle after commanding a move
 };
 
 #endif

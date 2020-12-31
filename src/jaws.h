@@ -24,11 +24,11 @@ class Jaws {
    private:
     uint8_t _pin;
     Servo _servo;
-    uint16_t _degOpen = 140;
-    uint16_t _degClosed = 90;
+    uint16_t _valueOpen = 1600;;
+    uint16_t _valueClosed = 900;
     Status _status;
     uint32_t _startMillis;
-    uint32_t _servoDelay = 100;
+    uint32_t _servoDelay = 400;
 };
 
 #endif

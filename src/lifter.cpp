@@ -16,7 +16,7 @@ void Lifter::begin() {
 void Lifter::up() {
     if (_status != Status::LIFTING) {
         _status = Status::LIFTING;
-        _servo.write(_degUp);
+        _servo.writeMicroseconds(_valueUp);
         _startMillis = millis();
     }
 }
@@ -24,7 +24,7 @@ void Lifter::up() {
 void Lifter::down() {
     if (_status != Status::LOWERING) {
         _status = Status::LOWERING;
-        _servo.write(_degDown);
+        _servo.writeMicroseconds(_valueDown);
         _startMillis = millis();
     }
 }

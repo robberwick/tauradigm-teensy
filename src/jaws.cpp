@@ -17,7 +17,7 @@ void Jaws::open() {
     if (_status != Status::OPENING) {
         _status = Status::OPENING;
         _startMillis = millis();
-        _servo.write(_degOpen);
+        _servo.writeMicroseconds(_valueOpen);
     }
 }
 
@@ -25,7 +25,7 @@ void Jaws::close() {
     if (_status != Status::CLOSING) {
         _status = Status::CLOSING;
         _startMillis = millis();
-        _servo.write(_degClosed);
+        _servo.writeMicroseconds(_valueClosed);
     }
 }
 
