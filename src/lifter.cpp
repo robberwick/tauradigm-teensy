@@ -14,27 +14,28 @@ void Lifter::begin() {
 }
 
 void Lifter::up() {
-    if (_status == Status::DOWN || _status == Status::LOWERING) {
+    if (_status != Status::LIFTING) {
         _status = Status::LIFTING;
+        _servo.write(_degUp);
         _startMillis = millis();
     }
-    update();
 }
 
 void Lifter::down() {
-    if (_status == Status::UP || _status == Status::LIFTING) {
+    if (_status != Status::LOWERING) {
         _status = Status::LOWERING;
+        _servo.write(_degDown);
         _startMillis = millis();
     }
-    update();
 }
 
 void Lifter::update() {
-    static uint32_t currMillis = millis();
+    uint32_t currMillis = millis();
     switch (_status) {
         case Status::DOWN:
             break;
         case Status::LIFTING:
+
             if ((currMillis - _startMillis) > _servoDelay) {
                 _status = Status::UP;
             }

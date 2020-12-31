@@ -14,19 +14,19 @@ void Jaws::begin() {
 }
 
 void Jaws::open() {
-    if (_status == Status::CLOSED || _status == Status::CLOSING) {
+    if (_status != Status::OPENING) {
         _status = Status::OPENING;
         _startMillis = millis();
+        _servo.write(_degOpen);
     }
-    update();
 }
 
 void Jaws::close() {
-    if (_status == Status::OPEN || _status == Status::OPENING) {
+    if (_status != Status::CLOSING) {
         _status = Status::CLOSING;
         _startMillis = millis();
+        _servo.write(_degClosed);
     }
-    update();
 }
 
 void Jaws::update() {

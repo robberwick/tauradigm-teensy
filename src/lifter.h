@@ -8,6 +8,7 @@
 class Lifter {
    public:
     enum Status {
+        UNSET,
         UP,
         DOWN,
         LIFTING,

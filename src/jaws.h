@@ -8,6 +8,7 @@
 class Jaws {
    public:
     enum Status {
+        UNSET,
         OPEN,
         CLOSED,
         OPENING,
@@ -27,7 +28,7 @@ class Jaws {
     uint16_t _degClosed = 90;
     Status _status;
     uint32_t _startMillis;
-    uint32_t _servoDelay;
+    uint32_t _servoDelay = 100;
 };
 
 #endif

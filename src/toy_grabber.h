@@ -16,6 +16,7 @@ class ToyGrabber {
     };
 
     enum class Command {
+        STOP,
         PICKUP,
         DEPOSIT
     };

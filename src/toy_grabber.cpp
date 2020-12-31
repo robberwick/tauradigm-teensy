@@ -15,6 +15,9 @@ void ToyGrabber::begin() {
 
     _jaws.begin();
     _jaws.open();
+    while ((_jaws.getStatus() != Jaws::Status::OPEN) && _lifter.getStatus() != Lifter::Status::DOWN) {
+        update();
+    }
 }
 
 void ToyGrabber::update() {
@@ -23,11 +26,10 @@ void ToyGrabber::update() {
     switch (_currentState) {
         case ToyGrabber::State::WAIT:
             if (_requestedCommand == ToyGrabber::Command::PICKUP) {
-                _currentState = ToyGrabber::State::GRABBING;
-                _jaws.open();
+                _currentState = ToyGrabber::State::OPENING;
+
             } else if (_requestedCommand == ToyGrabber::Command::DEPOSIT) {
                 _currentState = ToyGrabber::State::LOWERING;
-                _lifter.down();
             }
 
             break;
@@ -35,10 +37,12 @@ void ToyGrabber::update() {
             if (_jaws.getStatus() == Jaws::Status::OPEN) {
                 if (_requestedCommand == ToyGrabber::Command::PICKUP) {
                     _currentState = ToyGrabber::State::LOWERING;
-                    _lifter.down();
+
                 } else if (_requestedCommand == ToyGrabber::Command::DEPOSIT) {
                     _currentState = ToyGrabber::State::WAIT;
                 }
+            } else {
+                _jaws.open();
             }
             break;
 
@@ -46,22 +50,31 @@ void ToyGrabber::update() {
             if (_lifter.getStatus() == Lifter::Status::DOWN) {
                 if (_requestedCommand == ToyGrabber::Command::PICKUP) {
                     _currentState = ToyGrabber::State::GRABBING;
-                    _jaws.close();
+
                 } else if (_requestedCommand == ToyGrabber::Command::DEPOSIT) {
                     _currentState = ToyGrabber::State::OPENING;
-                    _jaws.open();
                 }
+            } else {
+                _lifter.down();
             }
             break;
 
         case ToyGrabber::State::GRABBING:
             if (_jaws.getStatus() == Jaws::Status::CLOSED) {
-                _lifter.up();
                 _currentState = ToyGrabber::State::LIFTING;
+            } else {
+                _jaws.close();
             }
             break;
         case ToyGrabber::State::LIFTING:
-            _currentState = ToyGrabber::State::WAIT;
+            if (_lifter.getStatus() == Lifter::Status::UP) {
+                if (_requestedCommand == Command::PICKUP) {
+                    _requestedCommand = Command::STOP;
+                }
+                _currentState = ToyGrabber::State::WAIT;
+            } else {
+                _lifter.up();
+            }
             break;
     }
 }
