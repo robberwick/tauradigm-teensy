@@ -1,0 +1,9 @@
+---
+BasedOnStyle: Google
+ColumnLimit: '0'
+SpaceBeforeParens: 'Never'
+BreakConstructorInitializers: 'BeforeColon'
+IndentWidth: '4'
+IndentCaseLabels: 'true'
+SpaceBeforeParens: ControlStatements
+...
