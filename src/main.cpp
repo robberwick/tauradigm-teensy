@@ -334,42 +334,6 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
 
-void pickupCube() {
-    //open jaw
-    // esc_1.writeMicroseconds(1600);
-    // delay(400);
-    // //jaw down
-    // esc_2.writeMicroseconds(1300);
-    // delay(500);
-    // //close jaw
-    // esc_1.writeMicroseconds(900);
-    // delay(400);
-    // //jaw up
-    // esc_2.writeMicroseconds(2100);
-    toyGrabber.pickup();
-}
-
-void putDownCube(){
-    // //jaw down
-    // esc_2.writeMicroseconds(1300);
-    // delay(500);
-    // //open jaw
-    // esc_1.writeMicroseconds(1600);
-    // delay(500);
-    toyGrabber.deposit();
-
-    // //back up
-    Speeds MotorSpeeds;
-    MotorSpeeds.left = MotorSpeeds.right = -40;
-    setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
-    delay(1000);
-    MotorSpeeds = deadStop;
-    for (uint8_t t = 0; t < 2; t++) {
-        setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
-        delay(100);
-    }
-}
-
 float distanceToWaypoint(Pose target, Pose current){
     //returns distance 'as the crow flies' to the target pose
     float distance;
@@ -406,9 +370,9 @@ void navigate(){
             delay(100);
         }
         if (currentWaypoint < 3){
-            pickupCube();
+            toyGrabber.pickup();
         } else {
-            putDownCube();
+            toyGrabber.deposit();
         }
         currentWaypoint += 1;
         uint8_t numOfWaypoints = sizeof(route) / sizeof(route[0]);
@@ -419,7 +383,7 @@ void navigate(){
         }
     } else {
         float speedP = 0.25;
-        float turnP = 25;
+        float turnP = 25;               
         float maxCorrection = 40;
         float minSpeed = 50;
         float maxSpeed = 70;
@@ -474,7 +438,7 @@ void processMessage(SerialTransfer &transfer) {
                 case 'x':
                     display.println(F("deposit cube"));
                     display.display();
-                    putDownCube();
+                    toyGrabber.deposit();
                     break;
                 // case 's':
                 //     esc_1.writeMicroseconds(1600);
@@ -485,7 +449,7 @@ void processMessage(SerialTransfer &transfer) {
                 case 't':
                     display.println(F("pickup cube"));
                     display.display();
-                    pickupCube();
+                    toyGrabber.pickup();
                     break;
                 case 'l':
                     display.println(F("zeroing heading"));
