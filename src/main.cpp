@@ -9,8 +9,8 @@
 #include <SerialTransfer.h>
 #include <Servo.h>
 #include <VL53L0X.h>
-#include <utility/imumaths.h>
 #include <math.h>
+#include <utility/imumaths.h>
 
 #include <unordered_map>
 
@@ -31,7 +31,7 @@ Servo motorRight;
 // Servo esc_1;
 // Servo esc_2;
 
-ToyGrabber toyGrabber(TEENSY_PIN_LH_BALL_ESC,TEENSY_PIN_RH_BALL_ESC);
+ToyGrabber toyGrabber(TEENSY_PIN_LH_BALL_ESC, TEENSY_PIN_RH_BALL_ESC);
 
 /*
 struct Pose {
@@ -40,8 +40,8 @@ struct Pose {
     float y;
 } currentPosition, previousPosition;
 */
-Pose currentPosition, previousPosition;
-float headingOffset=0;
+Pose currentPosition, previousPosition, receivedWaypoint;
+float headingOffset = 0;
 struct Speeds {
     float left;
     float right;
@@ -49,7 +49,7 @@ struct Speeds {
 float averageSpeed;
 float minSpeed = 1;
 struct Pose waypoints[4];
-uint8_t currentWaypoint=0;
+uint8_t currentWaypoint = 0;
 bool navigating = false;
 
 Speeds deadStop = {0, 0};
@@ -145,8 +145,8 @@ float batteryVoltage() {
     //AnalogRead returns 10bit fraction of Vdd
     adcReading = analogRead(TEENSY_PIN_BATT_SENSE) * 3.3 / 1023.0;
 
-     //ADC reads battery via a potential divider of 33k and 10k
-     //but they're wrong/out of spec ((33+10)/10 = 4.3)
+    //ADC reads battery via a potential divider of 33k and 10k
+    //but they're wrong/out of spec ((33+10)/10 = 4.3)
     voltage = adcReading * 3.71;
     return voltage;
 }
@@ -183,9 +183,9 @@ struct Speeds feedForward(struct Speeds targetSpeeds) {
     struct Speeds commandSpeeds;
 
     float minTurnPower = 4;       //determined from practical testing
-    float minForwardPower = 5;     //same
+    float minForwardPower = 5;    //same
     float powerCoefficient = 50;  //same
-    float turnThreshold = 100;     //units: mm/sec. arbitary, value.
+    float turnThreshold = 100;    //units: mm/sec. arbitary, value.
     // using the turnThreshold does create a discontinuity when transitioning
     // from mostly straight ahead to a slight turn but then the two moves
     // do need different power outputs. maybe linear interpolation between
@@ -236,8 +236,8 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     //speed is distance/time and should be a float in mm/sec
     Speeds travel = getWheelTravel();
     Speeds actualMotorSpeeds;
-    actualMotorSpeeds.right = travel.right/loopTime;
-    actualMotorSpeeds.left = travel.left/loopTime;
+    actualMotorSpeeds.right = travel.right / loopTime;
+    actualMotorSpeeds.left = travel.left / loopTime;
 
     //work out actual turn rate
     float actualTurnRate = wrapTwoPi(orientationReading.x - oldOrientationReading.x) / loopTime;
@@ -334,34 +334,35 @@ void setMotorSpeeds(Speeds requestedMotorSpeeds, Servo &motorLeft, Servo &motorR
     motorRight.writeMicroseconds(map(commandMotorSpeeds.right * -1, -100, 100, 1000, 2000));
 }
 
-float distanceToWaypoint(Pose target, Pose current){
+float distanceToWaypoint(Pose target, Pose current) {
     //returns distance 'as the crow flies' to the target pose
     float distance;
     //hypotenuse of dx, dy triangle gives distance, using h^2=x^2+y^2
-    distance = sqrt(powf((target.x-current.x),2) + powf((target.y-current.y),2));
+    distance = sqrt(powf((target.x - current.x), 2) + powf((target.y - current.y), 2));
     display.println(" ");
     display.printf("distance: %2.2f", distance);
     return distance;
 }
 
-float headingToWaypoint(Pose target, Pose current){
+float headingToWaypoint(Pose target, Pose current) {
     float dx, dy, relativeHeading;
-    dx = target.x-current.x;
-    dy = target.y-current.y;
+    dx = target.x - current.x;
+    dy = target.y - current.y;
     if (dy != 0) {
-        relativeHeading = (float) atan2(dy, dx);
+        relativeHeading = (float)atan2(dy, dx);
     } else {
-        relativeHeading = sgn(dy) * M_PI/2;
+        relativeHeading = sgn(dy) * M_PI / 2;
     }
     relativeHeading = wrapTwoPi(relativeHeading - current.heading);
 
     return relativeHeading;
 }
 
-void navigate(){
+void navigate() {
     Speeds MotorSpeeds;
     float positionTolerance = 100;
-    Pose targetWaypoint = route[currentWaypoint];
+    // Pose targetWaypoint = route[currentWaypoint];
+    Pose targetWaypoint = receivedWaypoint;
     float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition);
     if (distanceToGo < positionTolerance) {
         MotorSpeeds = deadStop;
@@ -369,21 +370,21 @@ void navigate(){
             setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
             delay(100);
         }
-        if (currentWaypoint < 3){
+        if (currentWaypoint < 3) {
             toyGrabber.pickup();
         } else {
             toyGrabber.deposit();
         }
         currentWaypoint += 1;
         uint8_t numOfWaypoints = sizeof(route) / sizeof(route[0]);
-        if (currentWaypoint > numOfWaypoints){
+        if (currentWaypoint > numOfWaypoints) {
             navigating = false;
             currentWaypoint = 0;
             MotorSpeeds = deadStop;
         }
     } else {
         float speedP = 0.25;
-        float turnP = 25;               
+        float turnP = 25;
         float maxCorrection = 40;
         float minSpeed = 50;
         float maxSpeed = 70;
@@ -391,12 +392,12 @@ void navigate(){
         display.println(" ");
         display.printf("heading: %2.2f", headingError);
         display.display();
-        if (turnP*headingError < maxCorrection){
-            MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (distanceToGo*speedP)), minSpeed);
+        if (turnP * headingError < maxCorrection) {
+            MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (distanceToGo * speedP)), minSpeed);
         }
         float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
-        MotorSpeeds.left+=turnSpeed;
-        MotorSpeeds.right-=turnSpeed;
+        MotorSpeeds.left += turnSpeed;
+        MotorSpeeds.right -= turnSpeed;
     }
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
 }
@@ -413,11 +414,11 @@ void processMessage(SerialTransfer &transfer) {
         // 0 - motor speed message
         case 1:
             Speeds requestedMotorSpeeds;
-//            float messages[4];
-//            transfer.rxObj(messages, sizeof(messages), sizeof(messageType));
-//            requestedMotorSpeeds = {messages[0], messages[1]};
+            //            float messages[4];
+            //            transfer.rxObj(messages, sizeof(messages), sizeof(messageType));
+            //            requestedMotorSpeeds = {messages[0], messages[1]};
             transfer.rxObj(requestedMotorSpeeds, recSize);
-            if (!navigating){
+            if (!navigating) {
                 setMotorSpeeds(requestedMotorSpeeds, motorLeft, motorRight);
             }
             // reset the missed motor mdessage count
@@ -456,19 +457,19 @@ void processMessage(SerialTransfer &transfer) {
                     display.display();
                     delay(500);
                     headingOffset = orientationReading.x;
-                    currentPosition.heading=0;
+                    currentPosition.heading = 0;
                     break;
                 case 'r':
                     display.println(F("zeroing odometry"));
                     display.display();
                     delay(500);
-                    currentPosition.x=0;
-                    currentPosition.y=0;
+                    currentPosition.x = 0;
+                    currentPosition.y = 0;
                     break;
                 case 'u':
                     display.println(F("navigating to next waypoint"));
                     display.display();
-                    navigating=true;
+                    navigating = true;
                     break;
                 case 'd':
                     display.println(F("stopping navigation"));
@@ -477,6 +478,11 @@ void processMessage(SerialTransfer &transfer) {
                     break;
             }
             break;
+        case 3:
+            Pose waypoint;
+            // TODO - unpack directly into receivedWaypoint?
+            transfer.rxObj(waypoint, sizeof(Pose), sizeof(messageType));
+            receivedWaypoint = waypoint;
         default:
             display.printf("invalid message type received %i", messageType);
             display.display();
@@ -836,7 +842,6 @@ void loop() {
     bool shouldInvertDisplay = false;
     // Have we missed 10 valid motor messages?
 
-
     if (missedMotorMessageCount >= 10) {
         shouldInvertDisplay = true;
         display.printf("missed message %d", missedMotorMessageCount);
@@ -857,7 +862,6 @@ void loop() {
     if ((missedMotorMessageCount >= 10) || (batteryVoltage() < minBatVoltage)) {
         setMotorSpeeds(deadStop, motorLeft, motorRight);
     }
-
 
     if (readSensors.hasPassed(10)) {
         readSensors.restart();
@@ -911,5 +915,4 @@ void loop() {
         // Send data
         myTransfer.sendData(payloadSize);
     }
-
 }
