@@ -391,21 +391,25 @@ void navigate() {
             MotorSpeeds = deadStop;
         }
     } else {
-        float speedP = 0.25;
-        float turnP = 25;
-        float maxCorrection = 40;
-        float minSpeed = 50;
-        float maxSpeed = 70;
-        float headingError = headingToWaypoint(targetWaypoint, currentPosition);
-        display.println(" ");
-        display.printf("heading: %2.2f", headingError);
-        display.display();
-        if (turnP * headingError < maxCorrection) {
-            MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (distanceToGo * speedP)), minSpeed);
+        if (atWaypoint){
+            MotorSpeeds = deadStop;
+        } else {
+            float speedP = 0.25;
+            float turnP = 25;
+            float maxCorrection = 40;
+            float minSpeed = 50;
+            float maxSpeed = 70;
+            float headingError = headingToWaypoint(targetWaypoint, currentPosition);
+            display.println(" ");
+            display.printf("heading: %2.2f", headingError);
+            display.display();
+            if (turnP * headingError < maxCorrection) {
+                MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (distanceToGo * speedP)), minSpeed);
+            }
+            float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
+            MotorSpeeds.left += turnSpeed;
+            MotorSpeeds.right -= turnSpeed;
         }
-        float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
-        MotorSpeeds.left += turnSpeed;
-        MotorSpeeds.right -= turnSpeed;
     }
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
 }
@@ -756,7 +760,7 @@ void setup() {
     };
 #endif
 
-    Serial2.begin(1000000);
+    Serial2.begin(500000);
     while (!Serial2) {
     };
 
@@ -920,10 +924,10 @@ void loop() {
         currentPosition = updatePose(previousPosition, relativeHeading, distanceMoved);
 
         // Prepare the distance data
-        payloadSize = myTransfer.txObj(distances, payloadSize);
+        //payloadSize = myTransfer.txObj(distances, payloadSize);
 
         //Prepare encoder data
-        payloadSize = myTransfer.txObj(encoderReadings, payloadSize);
+        // payloadSize = myTransfer.txObj(encoderReadings, payloadSize);
 
         //Prepare IMU data
         payloadSize = myTransfer.txObj(orientationReading, payloadSize);
