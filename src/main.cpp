@@ -357,14 +357,19 @@ float headingToWaypoint(Pose target, Pose current) {
 
     return relativeHeading;
 }
-
 void navigate() {
+    static Pose targetWaypoint;
+    static boolean atWaypoint;
     Speeds MotorSpeeds;
     float positionTolerance = 100;
-    // Pose targetWaypoint = route[currentWaypoint];
-    Pose targetWaypoint = receivedWaypoint;
+    // Only set the targetWaypoint to the received one if the received one differs from the target
+    if ((targetWaypoint.x != receivedWaypoint.x) || (targetWaypoint.y != receivedWaypoint.y)) {
+        targetWaypoint = receivedWaypoint;
+        atWaypoint = false;
+    }
     float distanceToGo = distanceToWaypoint(targetWaypoint, currentPosition);
-    if (distanceToGo < positionTolerance) {
+    if (!atWaypoint && (distanceToGo < positionTolerance)) {
+        atWaypoint = true;
         MotorSpeeds = deadStop;
         for (uint8_t t = 0; t < 5; t++) {
             setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
@@ -375,7 +380,10 @@ void navigate() {
         } else {
             toyGrabber.deposit();
         }
+        // OR.... set the targetWaypoint to null here and set the
         currentWaypoint += 1;
+        // TODO - how does the teensy know the length of the route?
+        // for now it's probably ok to fake it by hard coding the number of waypoints in here? maybe?
         uint8_t numOfWaypoints = sizeof(route) / sizeof(route[0]);
         if (currentWaypoint > numOfWaypoints) {
             navigating = false;
@@ -485,11 +493,9 @@ void processMessage(SerialTransfer &transfer) {
             {
                 Pose waypoint;
                 // TODO - unpack directly into receivedWaypoint?
-                transfer.rxObj(waypoint, sizeof(Pose), sizeof(messageType));
+                // transfer.rxObj(waypoint, sizeof(Pose), sizeof(messageType));
+                transfer.rxObj(waypoint, recSize);
                 receivedWaypoint = waypoint;
-                display.printf("wp: %2.0f, %2.0f", waypoint.x, waypoint.y);
-                display.display();
-                delay(500);
                 break;
             }
         default:
@@ -837,11 +843,8 @@ void loop() {
     display.println(" ");
     display.printf("position: %2.0f, %2.0f", currentPosition.x, currentPosition.y);
     display.println(" ");
-    display.printf("navigating: %1.0f", navigating ? "true" : "false");
-    display.println(" ");
-    display.printf("waypoint number: %1.0f", currentWaypoint);
-    
-    // display.printf("waypoint: %2.0f, %2.0f", receivedWaypoint.x, receivedWaypoint.y);
+    display.printf("waypoint number: %d", currentWaypoint);
+    display.printf("waypoint: %2.0f, %2.0f", receivedWaypoint.x, receivedWaypoint.y);
 
     display.display();
 
