@@ -427,62 +427,71 @@ void processMessage(SerialTransfer &transfer) {
             receiveMessage.restart();
             break;
         case 2:
-            char button;
-            transfer.rxObj(button, sizeof(button), sizeof(messageType));
-            switch (button) {
-                // case 'c':
-                //     esc_1.writeMicroseconds(900);
-                //     display.println(F("jaw closing"));
-                //     display.display();
-                //     delay(200);
-                //     break;
-                case 'x':
-                    display.println(F("deposit cube"));
-                    display.display();
-                    toyGrabber.deposit();
-                    break;
-                // case 's':
-                //     esc_1.writeMicroseconds(1600);
-                //     display.println(F("jaw opening"));
-                //     display.display();
-                //     delay(200);
-                //     break;
-                case 't':
-                    display.println(F("pickup cube"));
-                    display.display();
-                    toyGrabber.pickup();
-                    break;
-                case 'l':
-                    display.println(F("zeroing heading"));
-                    display.display();
-                    delay(500);
-                    headingOffset = orientationReading.x;
-                    currentPosition.heading = 0;
-                    break;
-                case 'r':
-                    display.println(F("zeroing odometry"));
-                    display.display();
-                    delay(500);
-                    currentPosition.x = 0;
-                    currentPosition.y = 0;
-                    break;
-                case 'u':
-                    display.println(F("navigating to next waypoint"));
-                    display.display();
-                    navigating = true;
-                    break;
-                case 'd':
-                    display.println(F("stopping navigation"));
-                    display.display();
-                    navigating = false;
-                    break;
+            {
+                char button;
+                transfer.rxObj(button, sizeof(button), sizeof(messageType));
+                switch (button) {
+                    // case 'c':
+                    //     esc_1.writeMicroseconds(900);
+                    //     display.println(F("jaw closing"));
+                    //     display.display();
+                    //     delay(200);
+                    //     break;
+                    case 'x':
+                        display.println(F("deposit cube"));
+                        display.display();
+                        toyGrabber.deposit();
+                        break;
+                    // case 's':
+                    //     esc_1.writeMicroseconds(1600);
+                    //     display.println(F("jaw opening"));
+                    //     display.display();
+                    //     delay(200);
+                    //     break;
+                    case 't':
+                        display.println(F("pickup cube"));
+                        display.display();
+                        toyGrabber.pickup();
+                        break;
+                    case 'l':
+                        display.println(F("zeroing heading"));
+                        display.display();
+                        delay(500);
+                        headingOffset = orientationReading.x;
+                        currentPosition.heading = 0;
+                        break;
+                    case 'r':
+                        display.println(F("zeroing odometry"));
+                        display.display();
+                        delay(500);
+                        currentPosition.x = 0;
+                        currentPosition.y = 0;
+                        break;
+                    case 'u':
+                        display.println(F("navigating to next waypoint"));
+                        display.display();
+                        delay(500);
+                        navigating = true;
+                        break;
+                    case 'd':
+                        display.println(F("stopping navigation"));
+                        display.display();
+                        navigating = false;
+                        break;
+                }
+                break;
             }
-            break;
         case 3:
-            Pose waypoint;
-            // TODO - unpack directly into receivedWaypoint?
-            transfer.rxObj(waypoint, sizeof(Pose), sizeof(messageType));
-            receivedWaypoint = waypoint;
+            {
+                Pose waypoint;
+                // TODO - unpack directly into receivedWaypoint?
+                transfer.rxObj(waypoint, sizeof(Pose), sizeof(messageType));
+                receivedWaypoint = waypoint;
+                display.printf("wp: %2.0f, %2.0f", waypoint.x, waypoint.y);
+                display.display();
+                delay(500);
+                break;
+            }
         default:
             display.printf("invalid message type received %i", messageType);
             display.display();
@@ -827,6 +836,13 @@ void loop() {
     display.printf("heading: %2.2f", currentPosition.heading);
     display.println(" ");
     display.printf("position: %2.0f, %2.0f", currentPosition.x, currentPosition.y);
+    display.println(" ");
+    display.printf("navigating: %1.0f", navigating ? "true" : "false");
+    display.println(" ");
+    display.printf("waypoint number: %1.0f", currentWaypoint);
+    
+    // display.printf("waypoint: %2.0f, %2.0f", receivedWaypoint.x, receivedWaypoint.y);
+
     display.display();
 
     if (navigating) {
