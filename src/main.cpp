@@ -409,9 +409,9 @@ void navigate() {
             float turnD = 3;
             float maxCorrection = 40;
             float jTurnThreshold = 2;
-            float maxReverse = -150;
+            float maxReverse = -150;  //was -150
             float minSpeed = 30;
-            float maxSpeed = 70;
+            float maxSpeed = 70;  //was 70
             float headingError = headingToWaypoint(targetWaypoint, currentPosition);
             static float previousError;
             display.println(" ");
@@ -597,6 +597,11 @@ void post() {
             display.println("");
         } else {
             display.setCursor(64, display.getCursorY());
+        }
+        if (t == 4) {
+            display.clearDisplay();
+            display.display();
+            display.setCursor(0, 0);
         }
         display.display();
         delay(50);
