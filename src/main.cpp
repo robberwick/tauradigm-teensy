@@ -251,7 +251,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     // right motor power inverted when eventually sent, so here we just need to apply more (+) power if slow
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
     commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
-    float turnKp = 2;
+    float turnKp = 1;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right -= steeringCorrection;
@@ -359,7 +359,7 @@ float headingToWaypoint(Pose target, Pose current) {
 }
 void navigate() {
     static Pose targetWaypoint;
-    static boolean atWaypoint;
+    static boolean atWaypoint = true;
     Speeds MotorSpeeds;
     float positionTolerance = 100;
     // Only set the targetWaypoint to the received one if the received one differs from the target
@@ -406,11 +406,11 @@ void navigate() {
         } else {
             float speedP = 0.25;
             float turnP = 35;
-            float turnD = 3;
-            float maxCorrection = 40;
+            float turnD = 5;
+            float maxCorrection = 35;
             float jTurnThreshold = 2;
             float maxReverse = -150;  //was -150
-            float minSpeed = 30;
+            float minSpeed = 37;
             float maxSpeed = 70;  //was 70
             float headingError = headingToWaypoint(targetWaypoint, currentPosition);
             static float previousError;
@@ -418,7 +418,7 @@ void navigate() {
             display.printf("heading: %2.2f", headingError);
             display.display();
             if (abs(turnP * headingError) < maxCorrection) {
-                MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, ((distanceToGo-75) * speedP)), minSpeed);
+                MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, ((distanceToGo-100) * speedP)), minSpeed);
             } else {
                 if (abs(headingError) > jTurnThreshold) {
                     MotorSpeeds.left = MotorSpeeds.right = maxReverse;
