@@ -251,7 +251,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     // right motor power inverted when eventually sent, so here we just need to apply more (+) power if slow
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
     commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
-    float turnKp = 1;
+    float turnKp = 2;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right -= steeringCorrection;
