@@ -502,6 +502,44 @@ void driveDistance() {
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
 }
 
+void rotateToHeading() {
+
+   //based on navigate (above) but dispenses with any waypoint lists, grabber mode changes or Jturns
+   //transit is a waypoint a way past the actual target location, to avoid heading changes near the target
+    
+    Speeds MotorSpeeds;
+    float headingError = wrapTwoPi(transit.heading - currentPosition.heading);
+    float headingTolerance = 0.05;
+    if (abs(headingError) < headingTolerance) {
+        currentMode = rotated;
+        MotorSpeeds = deadStop;
+        for (uint8_t t = 0; t < 3; t++) {
+            setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
+            delay(100);
+        }
+    } else {
+        float turnP = 50;
+        float turnD = 5;
+        float maxCorrection = 50;
+        float minCorrection = 8;
+        static float previousError;
+        display.println(" ");
+        display.printf("heading: %2.2f", headingError);
+        float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
+        if (previousError) {
+            turnSpeed -= turnD * (previousError - headingError);
+        }
+        turnSpeed = sgn(turnSpeed)*max(minCorrection, abs(turnSpeed));
+        display.println(" ");
+        display.printf("speed: %2.2f", turnSpeed);
+        display.display();
+        previousError = headingError;
+        MotorSpeeds.left = turnSpeed;
+        MotorSpeeds.right = -turnSpeed;
+    }
+    setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
+}
+
 void processMessage(SerialTransfer &transfer) {
     // use this variable to keep track of how many
     // bytes we've processed from the receive buffer
@@ -587,7 +625,7 @@ void processMessage(SerialTransfer &transfer) {
                 // transfer.rxObj(waypoint, sizeof(Pose), sizeof(messageType));
                 transfer.rxObj(waypoint, recSize);
                 receivedWaypoint = waypoint;
-                // reset the missed motor mdessage count
+                // reset the missed motor message count
                 resetMissedMotorCount();
                 // We received a valid motor command, so reset the timer
                 receiveMessage.restart();
@@ -606,7 +644,23 @@ void processMessage(SerialTransfer &transfer) {
                 delay(200);
                 transit.x = waypoint.x + transitLookahead * cos(headingToTarget);
                 transit.y = waypoint.y + transitLookahead * sin(headingToTarget);
-                // reset the missed motor mdessage count
+                // reset the missed motor message count
+                resetMissedMotorCount();
+                // We received a valid motor command, so reset the timer
+                receiveMessage.restart();
+                break;
+            }
+        case 5:
+            {  //straight move request
+                currentMode = rotating;
+                navigating = true;
+                Pose waypoint;
+                transfer.rxObj(waypoint, recSize);
+                transit = waypoint;
+                display.printf("transit heading: %2.2f", transit.heading);
+                display.display();
+                delay(200);
+                // reset the missed motor message count
                 resetMissedMotorCount();
                 // We received a valid motor command, so reset the timer
                 receiveMessage.restart();
@@ -961,13 +1015,16 @@ void loop() {
     display.println(" ");
     display.printf("position: %2.0f, %2.0f", currentPosition.x, currentPosition.y);
     display.println(" ");
-    display.printf("transit: %2.0f, %2.0f", transit.x, transit.y);
+    display.printf("transit: %2.0f, %2.0f, %2.0f", transit.x, transit.y, transit.heading);
     display.println(" ");
 
     display.display();
 
     if (currentMode == travelling) {
         driveDistance();
+    }
+    if (currentMode == rotating) {
+        rotateToHeading();
     }
     // if the message sending timeout has passed then increment the missed count
     // and reset
