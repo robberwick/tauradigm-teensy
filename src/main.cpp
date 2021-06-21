@@ -40,7 +40,7 @@ struct Pose {
     float y;
 } currentPosition, previousPosition;
 */
-Pose currentPosition, previousPosition, receivedWaypoint;
+Pose currentPosition, previousPosition, receivedWaypoint, transit;
 float headingOffset = 0;
 struct Speeds {
     float left;
@@ -48,6 +48,19 @@ struct Speeds {
 };
 float averageSpeed;
 float minSpeed = 1;
+float transitLookahead = 200;
+
+enum Mode {
+    travelling,
+    travelled,
+    rotating,
+    rotated,
+    firing,
+    fired,
+    reloading,
+    reloaded
+};
+enum Mode currentMode = travelled;
 struct Pose waypoints[4];
 uint8_t currentWaypoint = 0;
 bool navigating = false;
@@ -246,12 +259,12 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     //display.printf("P in L:%3.0f,  A R:%3.0f", commandSpeeds.left, commandSpeeds.right);
     // do actual Proportional calc.
     //speed error is target - actual.
-    float fwdKp = 0.025;  //ie. how much power to use for a given speed error
+    float fwdKp = 0.005;  //ie. how much power to use for a given speed error
     //apply P correction. right encoder reads negative when going forwards.
     // right motor power inverted when eventually sent, so here we just need to apply more (+) power if slow
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
     commandSpeeds.right += fwdKp * (targetSpeeds.right + actualMotorSpeeds.right);
-    float turnKp = 2;
+    float turnKp = 0.25;
     float steeringCorrection = turnKp * (targetTurnRate - actualTurnRate);
     commandSpeeds.left += steeringCorrection;
     commandSpeeds.right -= steeringCorrection;
@@ -348,10 +361,10 @@ float headingToWaypoint(Pose target, Pose current) {
     float dx, dy, relativeHeading;
     dx = target.x - current.x;
     dy = target.y - current.y;
-    if (dy != 0) {
+    if (dx != 0) {
         relativeHeading = (float)atan2(dy, dx);
     } else {
-        relativeHeading = sgn(dy) * M_PI / 2;
+        relativeHeading = sgn(dx) * M_PI / 2;
     }
     relativeHeading = wrapTwoPi(relativeHeading - current.heading);
 
@@ -436,6 +449,59 @@ void navigate() {
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
 }
 
+void driveDistance() {
+
+   //based on navigate (above) but dispenses with any waypoint lists, grabber mode changes or Jturns
+   //transit is a waypoint a way past the actual target location, to avoid heading changes near the target
+    
+    Speeds MotorSpeeds;
+    
+    float distanceToGo = distanceToWaypoint(transit, currentPosition);
+    if (distanceToGo < transitLookahead) {
+        currentMode = travelled;
+        MotorSpeeds = deadStop;
+        for (uint8_t t = 0; t < 3; t++) {
+            setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
+            delay(100);
+        }
+    } else {
+        boolean travellingForward = true;
+        float speedP = 0.25;
+        float turnP = 10;
+        float turnD = 0;
+        float maxCorrection = 10;
+        float minSpeed = 30;
+        float maxSpeed = 70;
+        float slowDistance = 50;
+        float headingError = headingToWaypoint(transit, currentPosition);
+        if (abs(headingError)> M_PI/2){
+            //if the target is behind us, assume we're travelling backwards
+            headingError = wrapTwoPi(headingError + M_PI);
+            travellingForward = false;
+            display.println(" ");
+            display.printf("reversing");
+        }
+        static float previousError;
+        display.println(" ");
+        display.printf("heading: %2.2f", headingError);
+        display.display();
+        float effectiveDistanceToGo =  distanceToGo-transitLookahead-slowDistance;
+        MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (effectiveDistanceToGo * speedP)), minSpeed);
+        if (!travellingForward){
+            MotorSpeeds.left = -MotorSpeeds.left;
+            MotorSpeeds.right = -MotorSpeeds.right;
+        }
+        float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
+        if (previousError) {
+            turnSpeed -= turnD * (previousError - headingError);
+        }
+        previousError = headingError;
+        MotorSpeeds.left += turnSpeed;
+        MotorSpeeds.right -= turnSpeed;
+    }
+    setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
+}
+
 void processMessage(SerialTransfer &transfer) {
     // use this variable to keep track of how many
     // bytes we've processed from the receive buffer
@@ -465,15 +531,15 @@ void processMessage(SerialTransfer &transfer) {
                 transfer.rxObj(button, sizeof(button), sizeof(messageType));
                 switch (button) {
                     // case 'c':
-                    //     esc_1.writeMicroseconds(900);
-                    //     display.println(F("jaw closing"));
+                    //     currentMode = travelled;
+                     //    display.println(F("stopping"));
                     //     display.display();
                     //     delay(200);
                     //     break;
                     case 'x':
-                        display.println(F("deposit cube"));
+                        currentMode = travelled;
+                        display.println(F("stopping"));
                         display.display();
-                        toyGrabber.deposit();
                         break;
                     // case 's':
                     //     esc_1.writeMicroseconds(1600);
@@ -484,7 +550,6 @@ void processMessage(SerialTransfer &transfer) {
                     case 't':
                         display.println(F("pickup cube"));
                         display.display();
-                        toyGrabber.pickup();
                         break;
                     case 'l':
                         display.println(F("zeroing heading"));
@@ -511,7 +576,6 @@ void processMessage(SerialTransfer &transfer) {
                         display.display();
                         navigating = false;
                         currentWaypoint = 0;
-                        toyGrabber.begin();
                         break;
                 }
                 break;
@@ -523,6 +587,25 @@ void processMessage(SerialTransfer &transfer) {
                 // transfer.rxObj(waypoint, sizeof(Pose), sizeof(messageType));
                 transfer.rxObj(waypoint, recSize);
                 receivedWaypoint = waypoint;
+                // reset the missed motor mdessage count
+                resetMissedMotorCount();
+                // We received a valid motor command, so reset the timer
+                receiveMessage.restart();
+                break;
+            }
+        case 4:
+            {  //straight move request
+                currentMode = travelling;
+                navigating = true;
+                Pose waypoint;
+                transfer.rxObj(waypoint, recSize);
+                transit = waypoint;
+                float headingToTarget = headingToWaypoint(waypoint, currentPosition);
+                display.printf("waypoint heading: %2.2f", headingToTarget);
+                display.display();
+                delay(200);
+                transit.x = waypoint.x + transitLookahead * cos(headingToTarget);
+                transit.y = waypoint.y + transitLookahead * sin(headingToTarget);
                 // reset the missed motor mdessage count
                 resetMissedMotorCount();
                 // We received a valid motor command, so reset the timer
@@ -866,8 +949,7 @@ void setup() {
 }
 
 void loop() {
-    // tick the toygrabber fsm
-    toyGrabber.update();
+
 
     // Is there an incoming message available?
     if (myTransfer.available()) {
@@ -879,12 +961,13 @@ void loop() {
     display.println(" ");
     display.printf("position: %2.0f, %2.0f", currentPosition.x, currentPosition.y);
     display.println(" ");
-    display.printf("waypoint: %2.0f, %2.0f", receivedWaypoint.x, receivedWaypoint.y);
+    display.printf("transit: %2.0f, %2.0f", transit.x, transit.y);
+    display.println(" ");
 
     display.display();
 
-    if (navigating) {
-        navigate();
+    if (currentMode == travelling) {
+        driveDistance();
     }
     // if the message sending timeout has passed then increment the missed count
     // and reset
@@ -958,7 +1041,7 @@ void loop() {
         //payloadSize = myTransfer.txObj(distances, payloadSize);
 
         //Prepare encoder data
-        // payloadSize = myTransfer.txObj(encoderReadings, payloadSize);
+        //payloadSize = myTransfer.txObj(encoderReadings, payloadSize);
 
         //Prepare IMU data
         payloadSize = myTransfer.txObj(orientationReading, payloadSize);
