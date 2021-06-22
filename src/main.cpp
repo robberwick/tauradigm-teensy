@@ -19,6 +19,7 @@
 #include "graphics.h"
 #include "routes.h"
 #include "toy_grabber.h"
+#include "feed_the_fish.h"
 
 // #define DEBUG
 
