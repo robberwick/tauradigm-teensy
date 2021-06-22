@@ -259,7 +259,7 @@ struct Speeds PID(struct Speeds targetSpeeds, struct Speeds commandSpeeds) {
     //display.printf("P in L:%3.0f,  A R:%3.0f", commandSpeeds.left, commandSpeeds.right);
     // do actual Proportional calc.
     //speed error is target - actual.
-    float fwdKp = 0.005;  //ie. how much power to use for a given speed error
+    float fwdKp = 0.015;  //ie. how much power to use for a given speed error
     //apply P correction. right encoder reads negative when going forwards.
     // right motor power inverted when eventually sent, so here we just need to apply more (+) power if slow
     commandSpeeds.left += fwdKp * (targetSpeeds.left - actualMotorSpeeds.left);
@@ -370,6 +370,18 @@ float headingToWaypoint(Pose target, Pose current) {
 
     return relativeHeading;
 }
+float bearingToWaypoint(Pose target, Pose current) {
+    float dx, dy, heading;
+    dx = target.x - current.x;
+    dy = target.y - current.y;
+    if (dx != 0) {
+        heading = (float)atan2(dy, dx);
+    } else {
+        heading = sgn(dx) * M_PI / 2;
+    }
+
+    return heading;
+}
 void navigate() {
     static Pose targetWaypoint;
     static boolean atWaypoint = true;
@@ -448,6 +460,39 @@ void navigate() {
     }
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
 }
+void nudge(bool leftForward = true, bool rightForward = true, float minChange = 5) {
+    Speeds motorPower, direction;
+    float nudgePower = 20;       //determined from practical testing
+    
+    direction.left = leftForward ? 1 : -1;
+    direction.right = rightForward ? 1 : -1;
+    
+
+    //assign a small value that should be enough to move, but not quickly
+    motorPower.left = nudgePower * direction.left;
+    motorPower.right = nudgePower * direction.right;
+    motorLeft.writeMicroseconds(map(motorPower.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(motorPower.right * -1, -100, 100, 1000, 2000));
+
+    float change = 0;
+    long encoderChange[NUM_ENCODERS];
+    long encoderInitial[NUM_ENCODERS];
+    for (u_int8_t n = 0; n < 4; n++) {
+        encoderInitial[n] = encoders[n].read();
+    }
+    while (change<minChange){
+        /// Read Encoder counts
+        for (u_int8_t n = 0; n < 4; n++) {
+            encoderChange[n] = encoders[n].read()-encoderInitial[n];
+        }
+        change = direction.left * (encoderChange[0]+encoderChange[1]);
+        change -= direction.right * (encoderChange[3]);
+        delay(1);
+    }
+    motorPower = deadStop;
+    motorLeft.writeMicroseconds(map(motorPower.left, -100, 100, 1000, 2000));
+    motorRight.writeMicroseconds(map(motorPower.right * -1, -100, 100, 1000, 2000));
+}
 
 void driveDistance() {
 
@@ -465,14 +510,8 @@ void driveDistance() {
             delay(100);
         }
     } else {
-        boolean travellingForward = true;
-        float speedP = 0.25;
-        float turnP = 10;
-        float turnD = 0;
-        float maxCorrection = 10;
-        float minSpeed = 30;
-        float maxSpeed = 70;
-        float slowDistance = 50;
+        static float previousError;
+        bool travellingForward = true;
         float headingError = headingToWaypoint(transit, currentPosition);
         if (abs(headingError)> M_PI/2){
             //if the target is behind us, assume we're travelling backwards
@@ -481,26 +520,52 @@ void driveDistance() {
             display.println(" ");
             display.printf("reversing");
         }
-        static float previousError;
-        display.println(" ");
-        display.printf("heading: %2.2f", headingError);
-        display.display();
-        float effectiveDistanceToGo =  distanceToGo-transitLookahead-slowDistance;
-        MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (effectiveDistanceToGo * speedP)), minSpeed);
-        if (!travellingForward){
-            MotorSpeeds.left = -MotorSpeeds.left;
-            MotorSpeeds.right = -MotorSpeeds.right;
+        float startNudgingDistance = 20;
+        if (distanceToGo < (startNudgingDistance + transitLookahead)){
+            bool rightForward;
+            bool leftForward;
+            if (travellingForward){
+                display.printf("nudging forwards");
+                rightForward = true;
+                leftForward = true;
+            } else {
+                display.printf("nudging backwards");
+                rightForward = false;
+                leftForward = false;
+            }
+            display.display();
+            nudge(leftForward,rightForward,6);
+            delay(100);
+            previousError = headingError;
+        } else {
+            float speedP = 0.25;
+            float turnP = 100;
+            float turnD = 50;
+            float maxCorrection = 25;
+            float minSpeed = 25;
+            float maxSpeed = 70;
+            float slowDistance = 90;
+            display.println(" ");
+            display.printf("heading: %2.2f", headingError);
+            display.display();
+            float effectiveDistanceToGo =  distanceToGo-transitLookahead-slowDistance;
+            MotorSpeeds.left = MotorSpeeds.right = max(min(maxSpeed, (effectiveDistanceToGo * speedP)), minSpeed);
+            if (!travellingForward){
+                MotorSpeeds.left = -MotorSpeeds.left;
+                MotorSpeeds.right = -MotorSpeeds.right;
+            }
+            float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
+            if (previousError) {
+                turnSpeed -= turnD * (previousError - headingError);
+            }
+            previousError = headingError;
+            MotorSpeeds.left += turnSpeed;
+            MotorSpeeds.right -= turnSpeed;
         }
-        float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
-        if (previousError) {
-            turnSpeed -= turnD * (previousError - headingError);
-        }
-        previousError = headingError;
-        MotorSpeeds.left += turnSpeed;
-        MotorSpeeds.right -= turnSpeed;
     }
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
 }
+
 
 void rotateToHeading() {
 
@@ -508,21 +573,45 @@ void rotateToHeading() {
    //transit is a waypoint a way past the actual target location, to avoid heading changes near the target
     
     Speeds MotorSpeeds;
+    static float previousError;
     float headingError = wrapTwoPi(transit.heading - currentPosition.heading);
+    float currentSpinRate = 0;
+    if (previousError) {
+            currentSpinRate = (previousError - headingError);
+    }
     float headingTolerance = 0.05;
-    if (abs(headingError) < headingTolerance) {
+    float rateTolerance = 0.01;
+    float nudgeTolerance = 0.15;
+    if ((abs(headingError) < headingTolerance) && (abs(currentSpinRate)<rateTolerance)) {
         currentMode = rotated;
         MotorSpeeds = deadStop;
         for (uint8_t t = 0; t < 3; t++) {
             setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
             delay(100);
         }
+    } else if ((abs(headingError) < nudgeTolerance)){
+        //we're close to the correct heading, just do small fixed distance moves until we're there
+        bool rightForward;
+        bool leftForward;
+        display.println(" ");
+        if (headingError > 0) {
+            display.printf("nudging right");
+            rightForward = false;
+            leftForward = true;
+        } else {
+            display.printf("nudging left");
+            rightForward = true;
+            leftForward = false;
+        }
+        display.display();
+        nudge(leftForward,rightForward,15);
+        delay(50);
+        previousError = headingError;
     } else {
-        float turnP = 50;
-        float turnD = 5;
-        float maxCorrection = 50;
-        float minCorrection = 8;
-        static float previousError;
+        float turnP = 100;
+        float turnD = 50;
+        float maxCorrection = 30;
+        float minCorrection = 28;
         display.println(" ");
         display.printf("heading: %2.2f", headingError);
         float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
@@ -539,6 +628,8 @@ void rotateToHeading() {
     }
     setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
 }
+
+
 
 void processMessage(SerialTransfer &transfer) {
     // use this variable to keep track of how many
@@ -638,7 +729,7 @@ void processMessage(SerialTransfer &transfer) {
                 Pose waypoint;
                 transfer.rxObj(waypoint, recSize);
                 transit = waypoint;
-                float headingToTarget = headingToWaypoint(waypoint, currentPosition);
+                float headingToTarget = bearingToWaypoint(waypoint, currentPosition);
                 display.printf("waypoint heading: %2.2f", headingToTarget);
                 display.display();
                 delay(200);
