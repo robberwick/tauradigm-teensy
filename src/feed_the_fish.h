@@ -1,7 +1,7 @@
 
 
 #include "config.h"
-#include "utils.h"
+
 
 const int solenoidFire = 1000;
 const int solenoidReset = 2000;

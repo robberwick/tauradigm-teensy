@@ -53,9 +53,9 @@ void challengeHandler(){
 }
 
 void fireSolenoid(float duration)
-{
-    digitalWrite(solenoidPin, LOW);
-    delay(duration);
+{//swapped high and low
     digitalWrite(solenoidPin, HIGH);
+    delay(duration);
+    digitalWrite(solenoidPin, LOW);
     delay(solenoidResetTime);
 }

@@ -1,3 +1,6 @@
+#ifndef _CONFIG__H_
+#define _CONFIG__H_
+
 #include <unordered_map>
 using namespace std;
 
@@ -35,3 +38,7 @@ HexIntMap I2C_ADDRESS_NAMES = {
 
 // timing constants
 #define BNO055_SAMPLERATE_DELAY_MS (100)
+
+#define sgn(x) ((x) < 0 ? -1 : ((x) > 0 ? 1 : 0))
+
+#endif  //_CONFIG__H_

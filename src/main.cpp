@@ -32,7 +32,7 @@ Servo motorRight;
 // Servo esc_1;
 // Servo esc_2;
 
-ToyGrabber toyGrabber(TEENSY_PIN_LH_BALL_ESC, TEENSY_PIN_RH_BALL_ESC);
+//ToyGrabber toyGrabber(TEENSY_PIN_LH_BALL_ESC, TEENSY_PIN_RH_BALL_ESC);
 
 /*
 struct Pose {
@@ -402,17 +402,17 @@ void navigate() {
             delay(100);
         }
         if (currentWaypoint < 3) {
-            toyGrabber.pickup();
+            //toyGrabber.pickup();
         } else {
-            toyGrabber.deposit();
+            //toyGrabber.deposit();
         }
         for  (uint8_t t = 0; t < 10; t++) {
-            toyGrabber.update();
+            //toyGrabber.update();
             delay(100);
         }
         if (currentWaypoint > 0) {
             for  (uint8_t t = 0; t < 10; t++) {
-                toyGrabber.update();
+                //toyGrabber.update();
                 delay(100);
             }
         }
@@ -678,8 +678,9 @@ void processMessage(SerialTransfer &transfer) {
                     //     delay(200);
                     //     break;
                     case 't':
-                        display.println(F("pickup cube"));
+                        display.println(F("firing solenoid"));
                         display.display();
+                        fireSolenoid(firingTime);
                         break;
                     case 'l':
                         display.println(F("zeroing heading"));
@@ -1034,7 +1035,7 @@ void setup() {
         // esc_1.attach(TEENSY_PIN_LH_BALL_ESC);
         // esc_2.attach(TEENSY_PIN_RH_BALL_ESC);
         // init toygrabber
-        toyGrabber.begin();
+        //toyGrabber.begin();
 
         // Set motors to stop
         setMotorSpeeds(deadStop, motorLeft, motorRight);
@@ -1092,6 +1093,7 @@ void setup() {
         display.display();
         delay(200);
     }
+    challengeSetup();
 }
 
 void loop() {
