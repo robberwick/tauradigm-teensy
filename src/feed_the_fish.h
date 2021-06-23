@@ -5,7 +5,7 @@
 
 const int solenoidFire = 1000;
 const int solenoidReset = 2000;
-const float firingTime = 21.2; //was 20.55
+const float firingTime = 20.25; //was 20.55
 const int solenoidResetTime = 1000;
 const int ballLoaderDefault = 1220;
 const int ballLoaderMidTravel = 1300;

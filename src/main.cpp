@@ -463,7 +463,7 @@ void navigate() {
 }
 void nudge(bool leftForward = true, bool rightForward = true, float minChange = 5) {
     Speeds motorPower, direction;
-    float nudgePower = 20;       //determined from practical testing
+    float nudgePower = 25;       //determined from practical testing
     
     direction.left = leftForward ? 1 : -1;
     direction.right = rightForward ? 1 : -1;
