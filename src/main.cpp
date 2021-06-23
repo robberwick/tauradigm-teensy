@@ -505,6 +505,7 @@ void driveDistance() {
     float distanceToGo = distanceToWaypoint(transit, currentPosition);
     if (distanceToGo < transitLookahead) {
         currentMode = travelled;
+        navigating = false;
         MotorSpeeds = deadStop;
         for (uint8_t t = 0; t < 3; t++) {
             setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
@@ -535,17 +536,17 @@ void driveDistance() {
                 leftForward = false;
             }
             display.display();
-            nudge(leftForward,rightForward,6);
-            delay(100);
+            nudge(leftForward,rightForward,10);
+            delay(10);
             previousError = headingError;
         } else {
-            float speedP = 0.25;
-            float turnP = 100;
+            float speedP = 0.3;  //was 0.25
+            float turnP = 40;
             float turnD = 50;
-            float maxCorrection = 25;
-            float minSpeed = 25;
+            float maxCorrection = 30;
+            float minSpeed = 30;
             float maxSpeed = 70;
-            float slowDistance = 90;
+            float slowDistance = 40;
             display.println(" ");
             display.printf("heading: %2.2f", headingError);
             display.display();
@@ -581,10 +582,11 @@ void rotateToHeading() {
             currentSpinRate = (previousError - headingError);
     }
     float headingTolerance = 0.05;
-    float rateTolerance = 0.01;
+    float rateTolerance = 0.05;
     float nudgeTolerance = 0.15;
     if ((abs(headingError) < headingTolerance) && (abs(currentSpinRate)<rateTolerance)) {
         currentMode = rotated;
+        navigating = false;
         MotorSpeeds = deadStop;
         for (uint8_t t = 0; t < 3; t++) {
             setMotorSpeeds(MotorSpeeds, motorLeft, motorRight);
@@ -605,14 +607,13 @@ void rotateToHeading() {
             leftForward = false;
         }
         display.display();
-        nudge(leftForward,rightForward,15);
-        delay(50);
+        nudge(leftForward,rightForward,28);
         previousError = headingError;
     } else {
-        float turnP = 100;
+        float turnP = 38;
         float turnD = 50;
-        float maxCorrection = 30;
-        float minCorrection = 28;
+        float maxCorrection = 40;
+        float minCorrection = 32;
         display.println(" ");
         display.printf("heading: %2.2f", headingError);
         float turnSpeed = min(max(turnP * headingError, -maxCorrection), maxCorrection);
@@ -680,7 +681,11 @@ void processMessage(SerialTransfer &transfer) {
                     case 't':
                         display.println(F("firing solenoid"));
                         display.display();
-                        fireSolenoid(firingTime);
+                        if (currentMode != fired){
+                            fireSolenoid(firingTime);
+                            currentMode = fired;
+                            navigating = false;
+                        }
                         break;
                     case 'l':
                         display.println(F("zeroing heading"));
@@ -726,6 +731,7 @@ void processMessage(SerialTransfer &transfer) {
             }
         case 4:
             {  //straight move request
+
                 currentMode = travelling;
                 navigating = true;
                 Pose waypoint;
@@ -742,9 +748,11 @@ void processMessage(SerialTransfer &transfer) {
                 // We received a valid motor command, so reset the timer
                 receiveMessage.restart();
                 break;
+
             }
         case 5:
-            {  //straight move request
+            {  //rotating move request
+
                 currentMode = rotating;
                 navigating = true;
                 Pose waypoint;
@@ -758,6 +766,7 @@ void processMessage(SerialTransfer &transfer) {
                 // We received a valid motor command, so reset the timer
                 receiveMessage.restart();
                 break;
+
             }
         default:
             display.printf("invalid message type received %i", messageType);
@@ -1111,7 +1120,8 @@ void loop() {
     display.println(" ");
     display.printf("transit: %2.0f, %2.0f, %2.0f", transit.x, transit.y, transit.heading);
     display.println(" ");
-
+    display.printf("current mode: %d", currentMode);
+    display.println(" ");
     display.display();
 
     if (currentMode == travelling) {
@@ -1188,6 +1198,7 @@ void loop() {
         float relativeHeading = orientationReading.x - headingOffset;
         currentPosition = updatePose(previousPosition, relativeHeading, distanceMoved);
 
+
         // Prepare the distance data
         //payloadSize = myTransfer.txObj(distances, payloadSize);
 
@@ -1199,6 +1210,10 @@ void loop() {
 
         //Prepare odometry data
         payloadSize = myTransfer.txObj(currentPosition, payloadSize);
+
+        //prepare mode state
+    
+        payloadSize = myTransfer.txObj((uint8_t)currentMode, payloadSize);
 
         // Send data
         myTransfer.sendData(payloadSize);

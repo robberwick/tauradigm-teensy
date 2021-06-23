@@ -8,7 +8,7 @@ Servo ballLoader;
 void challengeSetup(){
     ballLoader.attach(ballLoaderServoPin);
     pinMode(solenoidPin, OUTPUT);
-    digitalWrite(solenoidPin, HIGH);
+    digitalWrite(solenoidPin, LOW);
 }
 
 void ballLoaderEase(int firstValue, int secondValue, int step){
